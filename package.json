@@ -43,12 +43,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bizuit/form-template.git",
-    "directory": "packages/bizuit-form-sdk"
+    "url": "https://github.com/TYCON-SA/bizuit-form-sdk.git"
   },
-  "homepage": "https://github.com/bizuit/form-template#readme",
+  "homepage": "https://github.com/TYCON-SA/bizuit-form-sdk#readme",
   "bugs": {
-    "url": "https://github.com/bizuit/form-template/issues"
+    "url": "https://github.com/TYCON-SA/bizuit-form-sdk/issues"
   },
   "publishConfig": {
     "access": "public"

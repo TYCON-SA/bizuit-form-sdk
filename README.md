@@ -213,7 +213,7 @@ await sdk.process.start({ processName, parameters }, undefined, token)
 
 **🎯 This is the BEST PRACTICE for production applications.**
 
-[See full examples →](https://github.com/bizuit/form-template/tree/main/example/app)
+[See full examples →](https://github.com/TYCON-SA/bizuit-custom-form-sample/tree/main/example/app)
 
 ---
 
@@ -414,7 +414,7 @@ return (
 )
 ```
 
-[See live example →](https://github.com/bizuit/form-template/tree/main/example/app/example-2-manual-all)
+[See live example →](https://github.com/TYCON-SA/bizuit-custom-form-sample/tree/main/example/app/example-2-manual-all)
 
 ---
 
