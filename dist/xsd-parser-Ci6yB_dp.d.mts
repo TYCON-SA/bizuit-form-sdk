@@ -359,6 +359,196 @@ declare class BizuitAuthService {
 }
 
 /**
+ * XmlParameter - Wrapper class for XML parameters with Proxy-based property access
+ *
+ * Allows developers to work with XML parameters as mutable JavaScript objects:
+ *
+ * @example
+ * ```typescript
+ * const params = await sdk.process.getParametersAsObjects('MyProcess', '', token)
+ *
+ * // Direct property modification (thanks to Proxy)
+ * params.pSampleXml.nodo1 = 'a'
+ * params.pSampleXml.productos[0].codigo = 'ABC'
+ *
+ * // Send directly to process
+ * await sdk.process.start({
+ *   processName: 'MyProcess',
+ *   parameters: [params.pSampleXml]  // SDK auto-detects XmlParameter
+ * }, [], token)
+ * ```
+ */
+
+declare class XmlParameter {
+    /**
+     * Symbol used to identify XmlParameter instances
+     * Used by ProcessService for auto-detection
+     */
+    static readonly TYPE_SYMBOL: unique symbol;
+    private _name;
+    private _data;
+    private _type;
+    private _direction;
+    private _originalTemplate;
+    /**
+     * Creates a new XmlParameter instance
+     *
+     * @param name - Parameter name (e.g., 'pSampleXml')
+     * @param template - Object template representing the XML structure
+     * @param direction - Parameter direction (default: 'In')
+     *
+     * @example
+     * ```typescript
+     * const param = new XmlParameter('pDeudor', {
+     *   deudor: {
+     *     datosPersonales: {
+     *       id: null,
+     *       nombre: null
+     *     },
+     *     contactos: {
+     *       contacto: []
+     *     }
+     *   }
+     * }, 'In')
+     *
+     * // Direct property access via Proxy
+     * param.deudor.datosPersonales.nombre = 'Juan Perez'
+     * ```
+     */
+    constructor(name: string, template: any, direction?: 'In' | 'Out' | 'InOut');
+    /**
+     * Converts XmlParameter to IParameter format for ProcessService
+     *
+     * @returns IParameter object ready to send to Bizuit API
+     */
+    toParameter(): IParameter;
+    /**
+     * Gets the parameter name
+     */
+    getName(): string;
+    /**
+     * Gets the raw data object
+     */
+    getData(): any;
+    /**
+     * Gets the parameter direction
+     */
+    getDirection(): 'In' | 'Out' | 'InOut';
+    /**
+     * Resets the parameter data to the original template
+     */
+    reset(): void;
+    /**
+     * Creates a deep clone of the XmlParameter
+     *
+     * @returns New XmlParameter instance with cloned data
+     */
+    clone(): XmlParameter;
+    /**
+     * Converts the parameter data to JSON string
+     */
+    toJSON(): string;
+    /**
+     * Merges data from another object into this XmlParameter
+     *
+     * @param data - Object or XmlParameter to merge
+     * @param deep - Deep merge (default: true)
+     *
+     * @example
+     * ```typescript
+     * const param = new XmlParameter('pData', { raiz: { nombre: null, edad: null } })
+     * param.merge({ raiz: { nombre: 'Juan' } })
+     * // Result: { raiz: { nombre: 'Juan', edad: null } }
+     * ```
+     */
+    merge(data: any | XmlParameter, deep?: boolean): void;
+    /**
+     * Validates that all required fields have values (not null/undefined)
+     *
+     * @param schema - Optional schema object defining required fields
+     * @returns Array of missing field paths
+     *
+     * @example
+     * ```typescript
+     * const param = new XmlParameter('pData', { raiz: { nombre: null, edad: 30 } })
+     * param.raiz.nombre = 'Juan'
+     * const missing = param.validate()
+     * // Returns: [] (all fields filled)
+     *
+     * param.raiz.nombre = null
+     * const missing2 = param.validate()
+     * // Returns: ['raiz.nombre'] (missing field)
+     * ```
+     */
+    validate(schema?: any): string[];
+    /**
+     * Fills the parameter with data from a source object
+     * Useful for mapping form data to parameter structure
+     *
+     * @param source - Source data object
+     * @param mapping - Optional field mapping { sourceField: targetPath }
+     *
+     * @example
+     * ```typescript
+     * const param = new XmlParameter('pDeudor', {
+     *   Deudor: { ID: null, Nombre: null, Contactos: { Contacto: [] } }
+     * })
+     *
+     * param.fillFrom(
+     *   { id: 123, nombre: 'Juan', email: 'juan@example.com' },
+     *   {
+     *     id: 'Deudor.ID',
+     *     nombre: 'Deudor.Nombre',
+     *     email: 'Deudor.Contactos.Contacto[0].Valor'
+     *   }
+     * )
+     * ```
+     */
+    fillFrom(source: any, mapping?: Record<string, string>): void;
+    /**
+     * Gets a value by path (dot notation)
+     *
+     * @param path - Path in dot notation (e.g., 'raiz.productos.producto[0].codigo')
+     * @returns Value at path or undefined
+     */
+    getByPath(path: string): any;
+    /**
+     * Sets a value by path (dot notation)
+     *
+     * @param path - Path in dot notation
+     * @param value - Value to set
+     */
+    setByPath(path: string, value: any): void;
+    /**
+     * Deep clone helper
+     */
+    private _deepClone;
+    /**
+     * Deep merge helper
+     */
+    private _deepMerge;
+    /**
+     * Get value by path helper
+     */
+    private _getByPath;
+    /**
+     * Set value by path helper
+     */
+    private _setByPath;
+    /**
+     * Static helper to check if an object is an XmlParameter instance
+     *
+     * @param obj - Object to check
+     * @returns true if obj is an XmlParameter instance
+     */
+    static isXmlParameter(obj: any): obj is XmlParameter;
+}
+/**
+ * Type guard for XmlParameter
+ */
+declare function isXmlParameter(obj: any): obj is XmlParameter;
+
+/**
  * Bizuit Process Service
  * Handles process initialization, start and continue operations
  * Updated to match Bizuit API specification exactly
@@ -450,6 +640,33 @@ declare class BizuitProcessService {
      * }
      */
     continue(params: IStartProcessParams, files?: File[], token?: string): Promise<IProcessResult>;
+    /**
+     * Get process parameters as XmlParameter objects (NEW in v2.1.0)
+     *
+     * Returns parameters wrapped in XmlParameter instances, allowing direct property access:
+     *
+     * @example
+     * ```typescript
+     * const params = await sdk.process.getParametersAsObjects({
+     *   processName: 'MyProcess',
+     *   token: authToken
+     * })
+     *
+     * // Direct property modification via Proxy
+     * params.pSampleXml.nodo1 = 'a'
+     * params.pSampleXml.productos[0].codigo = 'ABC'
+     *
+     * // Send directly to process
+     * await sdk.process.start({
+     *   processName: 'MyProcess',
+     *   parameters: [params.pSampleXml]  // SDK auto-converts
+     * }, [], token)
+     * ```
+     *
+     * @param params - Initialize parameters (processName, version, etc.)
+     * @returns Object with parameter names as keys, XmlParameter instances as values
+     */
+    getParametersAsObjects(params: IInitializeParams): Promise<Record<string, XmlParameter>>;
     /**
      * Get Bizuit configuration settings for an organization
      * @param organizationId - Organization identifier
@@ -1220,9 +1437,9 @@ type ErrorContext = 'load' | 'submit' | 'lock' | 'start' | 'general';
 declare function formatBizuitError(error: any, context?: ErrorContext): string;
 
 /**
- * XML to JSON Converter
- * Automatically converts XML strings to JavaScript objects
- * Used by process-service to parse XML parameters
+ * XML to JSON Converter (bidirectional)
+ * Automatically converts between XML strings and JavaScript objects
+ * Used by process-service to parse/serialize XML parameters
  */
 /**
  * Converts an XML string to a JavaScript object
@@ -1263,5 +1480,80 @@ declare function formatBizuitError(error: any, context?: ErrorContext): string;
  * ```
  */
 declare function xmlToJson(xmlString: string): any | null;
+/**
+ * Converts a JavaScript object to an XML string
+ * This is the inverse operation of xmlToJson()
+ *
+ * @param obj - The JavaScript object to convert
+ * @param options - Conversion options
+ * @returns XML string representation of the object
+ *
+ * @example
+ * ```typescript
+ * const obj = {
+ *   raiz: {
+ *     nombre: "Test",
+ *     productos: {
+ *       producto: [
+ *         { codigo: "PROD001", descripcion: "Producto 1" },
+ *         { codigo: "PROD002", descripcion: "Producto 2" }
+ *       ]
+ *     }
+ *   }
+ * }
+ *
+ * const xml = jsonToXml(obj)
+ * // <raiz>
+ * //   <nombre>Test</nombre>
+ * //   <productos>
+ * //     <producto>
+ * //       <codigo>PROD001</codigo>
+ * //       <descripcion>Producto 1</descripcion>
+ * //     </producto>
+ * //     <producto>
+ * //       <codigo>PROD002</codigo>
+ * //       <descripcion>Producto 2</descripcion>
+ * //     </producto>
+ * //   </productos>
+ * // </raiz>
+ * ```
+ */
+declare function jsonToXml(obj: any, options?: {
+    indent?: number;
+    currentIndent?: number;
+}): string;
 
-export { type ILockInfo as $, type AuthControlType as A, BizuitSDK as B, type ContinueProcessStatus as C, type InstanceLockStatus as D, BizuitHttpClient as E, BizuitAuthService as F, BizuitProcessService as G, BizuitInstanceLockService as H, type IBizuitConfig as I, BizuitFormService as J, ParameterParser as K, BizuitError as L, handleError as M, xmlToJson as N, type IBizuitProcessParameter as O, type ParameterType as P, filterFormParameters as Q, type Result as R, type StartProcessStatus as S, filterContinueParameters as T, isParameterRequired as U, getParameterDirectionLabel as V, getParameterTypeLabel as W, formDataToParameters as X, parametersToFormData as Y, createParameter as Z, mergeParameters as _, type IUserInfo as a, type ILoadInstanceDataResult as a0, type ILoadInstanceDataOptions as a1, loadInstanceDataForContinue as a2, releaseInstanceLock as a3, processUrlToken as a4, type IParameterMapping as a5, buildParameters as a6, parseBizuitUrlParam as a7, createAuthFromUrlToken as a8, buildLoginRedirectUrl as a9, type ErrorContext as aa, formatBizuitError as ab, type IRequestCheckFormAuth as b, type IApiError as c, type IAuthCheckData as d, type IAuthCheckResponse as e, type ILoginSettings as f, type ILoginRequest as g, type ILoginResponse as h, type IBizuitAuthHeaders as i, type ParameterDirection as j, type ProcessStatus as k, type IParameter as l, type IProcessParameter as m, type IInitializeParams as n, type IProcessData as o, type IActivityResult as p, type IStartProcessParams as q, type IProcessResult as r, type IRaiseEventParams as s, type IRaiseEventResult as t, type IEventParameter as u, type IInstanceData as v, type ILockStatus as w, type ILockRequest as x, type IUnlockRequest as y, type ProcessFlowStatus as z };
+/**
+ * XSD Schema Parser
+ *
+ * Parses XSD (XML Schema Definition) and generates JavaScript object templates
+ * for use with XmlParameter class.
+ *
+ * @example
+ * ```typescript
+ * const xsd = `
+ *   <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+ *     <xs:element name="deudor">
+ *       <xs:complexType>
+ *         <xs:sequence>
+ *           <xs:element name="id" type="xs:integer"/>
+ *           <xs:element name="nombre" type="xs:string"/>
+ *         </xs:sequence>
+ *       </xs:complexType>
+ *     </xs:element>
+ *   </xs:schema>
+ * `
+ *
+ * const template = parseXsdToTemplate(xsd)
+ * // Result: { deudor: { id: null, nombre: null } }
+ * ```
+ */
+/**
+ * Parses an XSD schema string and generates a JavaScript object template
+ *
+ * @param xsdString - XSD schema as string
+ * @returns JavaScript object template representing the schema structure
+ */
+declare function parseXsdToTemplate(xsdString: string): any;
+
+export { createParameter as $, type AuthControlType as A, BizuitSDK as B, type ContinueProcessStatus as C, type InstanceLockStatus as D, BizuitHttpClient as E, BizuitAuthService as F, BizuitProcessService as G, BizuitInstanceLockService as H, type IBizuitConfig as I, BizuitFormService as J, ParameterParser as K, BizuitError as L, handleError as M, xmlToJson as N, jsonToXml as O, type ParameterType as P, parseXsdToTemplate as Q, type Result as R, type StartProcessStatus as S, type IBizuitProcessParameter as T, filterFormParameters as U, filterContinueParameters as V, isParameterRequired as W, getParameterDirectionLabel as X, getParameterTypeLabel as Y, formDataToParameters as Z, parametersToFormData as _, type IUserInfo as a, mergeParameters as a0, type ILockInfo as a1, type ILoadInstanceDataResult as a2, type ILoadInstanceDataOptions as a3, loadInstanceDataForContinue as a4, releaseInstanceLock as a5, processUrlToken as a6, type IParameterMapping as a7, buildParameters as a8, parseBizuitUrlParam as a9, createAuthFromUrlToken as aa, buildLoginRedirectUrl as ab, type ErrorContext as ac, formatBizuitError as ad, XmlParameter as ae, isXmlParameter as af, type IRequestCheckFormAuth as b, type IApiError as c, type IAuthCheckData as d, type IAuthCheckResponse as e, type ILoginSettings as f, type ILoginRequest as g, type ILoginResponse as h, type IBizuitAuthHeaders as i, type ParameterDirection as j, type ProcessStatus as k, type IParameter as l, type IProcessParameter as m, type IInitializeParams as n, type IProcessData as o, type IActivityResult as p, type IStartProcessParams as q, type IProcessResult as r, type IRaiseEventParams as s, type IRaiseEventResult as t, type IEventParameter as u, type IInstanceData as v, type ILockStatus as w, type ILockRequest as x, type IUnlockRequest as y, type ProcessFlowStatus as z };

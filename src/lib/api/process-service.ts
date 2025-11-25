@@ -12,7 +12,9 @@ import type {
   IStartProcessParams,
   IProcessResult,
 } from '../types'
-import { xmlToJson } from '../utils/xml-parser'
+import { xmlToJson, jsonToXml } from '../utils/xml-parser'
+import { parseXsdToTemplate } from '../utils/xsd-parser'
+import { XmlParameter } from '../models/xml-parameter'
 
 export class BizuitProcessService {
   private client: BizuitHttpClient
@@ -112,10 +114,37 @@ export class BizuitProcessService {
       headers['Authorization'] = token
     }
 
+    // Process parameters: handle XmlParameter instances and object-to-XML conversion
+    const processedParameters = (params.parameters || []).map(param => {
+      // Check if parameter is an XmlParameter instance
+      if (XmlParameter.isXmlParameter(param)) {
+        // Convert XmlParameter to IParameter and then to XML
+        const iParam = (param as XmlParameter).toParameter()
+        const xmlString = jsonToXml(iParam.value)
+        console.log(`✅ Auto-converted XmlParameter "${iParam.name}" to XML`)
+        return {
+          ...iParam,
+          value: xmlString
+        }
+      }
+
+      // Existing behavior: convert plain objects to XML
+      if (param.type === 'Xml' && typeof param.value === 'object' && param.value !== null) {
+        // Auto-convert JavaScript object to XML string
+        const xmlString = jsonToXml(param.value)
+        console.log(`✅ Auto-converted parameter "${param.name}" from object to XML`)
+        return {
+          ...param,
+          value: xmlString
+        }
+      }
+      return param
+    })
+
     // Build the payload exactly as the API expects
     const payload: any = {
       eventName: params.processName,
-      parameters: params.parameters || [],
+      parameters: processedParameters,
     }
 
     // Add optional fields only if provided
@@ -312,9 +341,36 @@ export class BizuitProcessService {
       headers['Authorization'] = token
     }
 
+    // Process parameters: handle XmlParameter instances and object-to-XML conversion
+    const processedParameters = (params.parameters || []).map(param => {
+      // Check if parameter is an XmlParameter instance
+      if (XmlParameter.isXmlParameter(param)) {
+        // Convert XmlParameter to IParameter and then to XML
+        const iParam = (param as XmlParameter).toParameter()
+        const xmlString = jsonToXml(iParam.value)
+        console.log(`✅ Auto-converted XmlParameter "${iParam.name}" to XML`)
+        return {
+          ...iParam,
+          value: xmlString
+        }
+      }
+
+      // Existing behavior: convert plain objects to XML
+      if (param.type === 'Xml' && typeof param.value === 'object' && param.value !== null) {
+        // Auto-convert JavaScript object to XML string
+        const xmlString = jsonToXml(param.value)
+        console.log(`✅ Auto-converted parameter "${param.name}" from object to XML`)
+        return {
+          ...param,
+          value: xmlString
+        }
+      }
+      return param
+    })
+
     const payload: any = {
       eventName: params.processName,
-      parameters: params.parameters || [],
+      parameters: processedParameters,
       instanceId: params.instanceId,
     }
 
@@ -369,6 +425,81 @@ export class BizuitProcessService {
       if ((result as any).tyconParameters) {
         result.parameters = parametersArray;
       }
+    }
+
+    return result
+  }
+
+  /**
+   * Get process parameters as XmlParameter objects (NEW in v2.1.0)
+   *
+   * Returns parameters wrapped in XmlParameter instances, allowing direct property access:
+   *
+   * @example
+   * ```typescript
+   * const params = await sdk.process.getParametersAsObjects({
+   *   processName: 'MyProcess',
+   *   token: authToken
+   * })
+   *
+   * // Direct property modification via Proxy
+   * params.pSampleXml.nodo1 = 'a'
+   * params.pSampleXml.productos[0].codigo = 'ABC'
+   *
+   * // Send directly to process
+   * await sdk.process.start({
+   *   processName: 'MyProcess',
+   *   parameters: [params.pSampleXml]  // SDK auto-converts
+   * }, [], token)
+   * ```
+   *
+   * @param params - Initialize parameters (processName, version, etc.)
+   * @returns Object with parameter names as keys, XmlParameter instances as values
+   */
+  async getParametersAsObjects(
+    params: IInitializeParams
+  ): Promise<Record<string, XmlParameter>> {
+    // Get process definition with parameters
+    const processData = await this.initialize(params)
+
+    const result: Record<string, XmlParameter> = {}
+
+    // Process XML parameters only
+    if (processData.parameters && Array.isArray(processData.parameters)) {
+      processData.parameters.forEach((param: any) => {
+        // Only process XML/Complex parameters (type 2)
+        if (param.parameterType === 2 || param.parameterType === 'Xml') {
+          const paramName = param.name
+
+          // Determine direction
+          let direction: 'In' | 'Out' | 'InOut' = 'In'
+          if (param.parameterDirection === 2 || param.parameterDirection === 'Out') {
+            direction = 'Out'
+          } else if (param.parameterDirection === 3 || param.parameterDirection === 'InOut') {
+            direction = 'InOut'
+          }
+
+          // Try to parse XSD schema if available
+          let template: any = {}
+
+          if (param.schema && typeof param.schema === 'string') {
+            try {
+              template = parseXsdToTemplate(param.schema)
+              console.log(`✅ Generated template from XSD for parameter: ${paramName}`)
+            } catch (error) {
+              console.warn(`⚠️ Failed to parse XSD for ${paramName}, using empty template:`, error)
+              template = {}
+            }
+          } else {
+            console.log(`ℹ️ No XSD schema for parameter ${paramName}, using empty template`)
+            template = {}
+          }
+
+          // Create XmlParameter instance
+          const xmlParam = new XmlParameter(paramName, template, direction)
+          result[paramName] = xmlParam
+        }
+      })
     }
 
     return result

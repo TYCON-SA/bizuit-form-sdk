@@ -1,10 +1,10 @@
 /**
  * XML Parser Tests
- * Tests for automatic XML to JSON conversion
+ * Tests for bidirectional XML <-> JSON conversion
  */
 
 import { describe, it, expect } from 'vitest'
-import { xmlToJson } from '../lib/utils/xml-parser'
+import { xmlToJson, jsonToXml } from '../lib/utils/xml-parser'
 
 describe('xmlToJson', () => {
   describe('Basic XML parsing', () => {
@@ -240,5 +240,174 @@ describe('xmlToJson', () => {
         }
       })
     })
+  })
+})
+
+describe('jsonToXml', () => {
+  describe('Basic JSON to XML conversion', () => {
+    it('should convert simple object to XML', () => {
+      const obj = {
+        raiz: {
+          nombre: 'Test'
+        }
+      }
+      const result = jsonToXml(obj)
+
+      expect(result).toBe('<raiz>\n  <nombre>Test</nombre>\n</raiz>')
+    })
+
+    it('should convert nested object to XML', () => {
+      const obj = {
+        raiz: {
+          nombre: 'Test',
+          complejo1: {
+            dato1: 'Value1',
+            dato2: 'Value2'
+          }
+        }
+      }
+      const result = jsonToXml(obj)
+
+      const expected = `<raiz>
+  <nombre>Test</nombre>
+  <complejo1>
+    <dato1>Value1</dato1>
+    <dato2>Value2</dato2>
+  </complejo1>
+</raiz>`
+
+      expect(result).toBe(expected)
+    })
+  })
+
+  describe('Array handling', () => {
+    it('should convert arrays to repeated XML elements', () => {
+      const obj = {
+        raiz: {
+          productos: {
+            producto: [
+              { codigo: 'PROD001', descripcion: 'Producto 1' },
+              { codigo: 'PROD002', descripcion: 'Producto 2' }
+            ]
+          }
+        }
+      }
+      const result = jsonToXml(obj)
+
+      const expected = `<raiz>
+  <productos>
+    <producto>
+      <codigo>PROD001</codigo>
+      <descripcion>Producto 1</descripcion>
+    </producto>
+    <producto>
+      <codigo>PROD002</codigo>
+      <descripcion>Producto 2</descripcion>
+    </producto>
+  </productos>
+</raiz>`
+
+      expect(result).toBe(expected)
+    })
+  })
+
+  describe('Special characters', () => {
+    it('should escape special XML characters', () => {
+      const obj = {
+        raiz: {
+          texto: 'Contains <special> & "characters" \'here\''
+        }
+      }
+      const result = jsonToXml(obj)
+
+      expect(result).toContain('&lt;special&gt;')
+      expect(result).toContain('&amp;')
+      expect(result).toContain('&quot;characters&quot;')
+      expect(result).toContain('&apos;here&apos;')
+    })
+  })
+
+  describe('Edge cases', () => {
+    it('should handle empty objects', () => {
+      const obj = {
+        raiz: {}
+      }
+      const result = jsonToXml(obj)
+
+      expect(result).toBe('<raiz></raiz>')
+    })
+
+    it('should handle null values', () => {
+      const obj = {
+        raiz: {
+          valor: null
+        }
+      }
+      const result = jsonToXml(obj)
+
+      expect(result).toBe('<raiz>\n  <valor></valor>\n</raiz>')
+    })
+
+    it('should handle primitive values', () => {
+      const obj = {
+        raiz: {
+          numero: 123,
+          booleano: true,
+          texto: 'abc'
+        }
+      }
+      const result = jsonToXml(obj)
+
+      const expected = `<raiz>
+  <numero>123</numero>
+  <booleano>true</booleano>
+  <texto>abc</texto>
+</raiz>`
+
+      expect(result).toBe(expected)
+    })
+  })
+})
+
+describe('Bidirectional conversion', () => {
+  it('should convert JSON to XML and back to JSON', () => {
+    const original = {
+      raiz: {
+        nombre: 'Test',
+        productos: {
+          producto: [
+            { codigo: 'PROD001', descripcion: 'Producto 1' },
+            { codigo: 'PROD002', descripcion: 'Producto 2' }
+          ]
+        }
+      }
+    }
+
+    const xml = jsonToXml(original)
+    const backToJson = xmlToJson(xml)
+
+    expect(backToJson).toEqual(original)
+  })
+
+  it('should preserve complex nested structures', () => {
+    const original = {
+      deudor: {
+        datosPersonales: {
+          id: '75',
+          nombre: 'John Doe'
+        },
+        contactos: {
+          contacto: [
+            { tipo: 'email', valor: 'john@example.com' },
+            { tipo: 'phone', valor: '123456789' }
+          ]
+        }
+      }
+    }
+
+    const xml = jsonToXml(original)
+    const backToJson = xmlToJson(xml)
+
+    expect(backToJson).toEqual(original)
   })
 })

@@ -378,6 +378,514 @@ function xmlToJson(xmlString) {
     return null;
   }
 }
+function jsonToXml(obj, options = {}) {
+  const { indent = 2, currentIndent = 0 } = options;
+  try {
+    if (obj === null || obj === void 0) {
+      return "";
+    }
+    if (typeof obj !== "object") {
+      return String(obj);
+    }
+    const keys = Object.keys(obj);
+    if (keys.length === 0) {
+      return "";
+    }
+    const rootKey = keys[0];
+    const rootValue = obj[rootKey];
+    return buildXmlNode(rootKey, rootValue, indent, currentIndent);
+  } catch (error) {
+    console.error("Error converting JSON to XML:", error);
+    return "";
+  }
+}
+function buildXmlNode(tagName, value, indent, currentIndent) {
+  const indentStr = " ".repeat(currentIndent);
+  const childIndentStr = " ".repeat(currentIndent + indent);
+  if (value === null || value === void 0) {
+    return `${indentStr}<${tagName}></${tagName}>`;
+  }
+  if (typeof value !== "object") {
+    return `${indentStr}<${tagName}>${escapeXml(String(value))}</${tagName}>`;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => buildXmlNode(tagName, item, indent, currentIndent)).join("\n");
+  }
+  const childKeys = Object.keys(value);
+  if (childKeys.length === 0) {
+    return `${indentStr}<${tagName}></${tagName}>`;
+  }
+  const childNodes = childKeys.map((key) => {
+    const childValue = value[key];
+    return buildXmlNode(key, childValue, indent, currentIndent + indent);
+  }).join("\n");
+  return `${indentStr}<${tagName}>
+${childNodes}
+${indentStr}</${tagName}>`;
+}
+function escapeXml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+// src/lib/utils/xsd-parser.ts
+function parseXsdToTemplate(xsdString) {
+  if (!xsdString || typeof xsdString !== "string") {
+    console.warn("Invalid XSD string provided");
+    return {};
+  }
+  try {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xsdString, "text/xml");
+    const parserError = xmlDoc.querySelector("parsererror");
+    if (parserError) {
+      console.error("XSD parsing error:", parserError.textContent);
+      return {};
+    }
+    const rootElement = xmlDoc.querySelector("schema > element, xs\\:schema > xs\\:element");
+    if (!rootElement) {
+      console.warn("No root element found in XSD");
+      return {};
+    }
+    const rootName = rootElement.getAttribute("name");
+    if (!rootName) {
+      console.warn("Root element has no name");
+      return {};
+    }
+    const rootValue = parseElement(rootElement, xmlDoc);
+    return { [rootName]: rootValue };
+  } catch (error) {
+    console.error("Error parsing XSD:", error);
+    return {};
+  }
+}
+function parseElement(element, xmlDoc) {
+  const elementType = element.getAttribute("type");
+  const minOccurs = element.getAttribute("minOccurs");
+  const maxOccurs = element.getAttribute("maxOccurs");
+  const isArray = maxOccurs === "unbounded" || maxOccurs && parseInt(maxOccurs, 10) > 1;
+  const complexType = element.querySelector(":scope > complexType, :scope > xs\\:complexType");
+  if (complexType) {
+    const value = parseComplexType(complexType, xmlDoc);
+    return isArray ? [value] : value;
+  }
+  if (elementType) {
+    const value = parseType(elementType, xmlDoc);
+    return isArray ? [value] : value;
+  }
+  return isArray ? [] : null;
+}
+function parseComplexType(complexType, xmlDoc) {
+  const result = {};
+  const sequence = complexType.querySelector(":scope > sequence, :scope > xs\\:sequence");
+  if (sequence) {
+    const elements = sequence.querySelectorAll(":scope > element, :scope > xs\\:element");
+    elements.forEach((el) => {
+      const name = el.getAttribute("name");
+      if (name) {
+        result[name] = parseElement(el, xmlDoc);
+      }
+    });
+    return result;
+  }
+  const all = complexType.querySelector(":scope > all, :scope > xs\\:all");
+  if (all) {
+    const elements = all.querySelectorAll(":scope > element, :scope > xs\\:element");
+    elements.forEach((el) => {
+      const name = el.getAttribute("name");
+      if (name) {
+        result[name] = parseElement(el, xmlDoc);
+      }
+    });
+    return result;
+  }
+  const choice = complexType.querySelector(":scope > choice, :scope > xs\\:choice");
+  if (choice) {
+    const firstElement = choice.querySelector(":scope > element, :scope > xs\\:element");
+    if (firstElement) {
+      const name = firstElement.getAttribute("name");
+      if (name) {
+        result[name] = parseElement(firstElement, xmlDoc);
+      }
+    }
+    return result;
+  }
+  return result;
+}
+function parseType(typeName, xmlDoc) {
+  const builtInTypes = {
+    "xs:string": null,
+    "xs:integer": null,
+    "xs:int": null,
+    "xs:long": null,
+    "xs:short": null,
+    "xs:byte": null,
+    "xs:decimal": null,
+    "xs:float": null,
+    "xs:double": null,
+    "xs:boolean": null,
+    "xs:date": null,
+    "xs:time": null,
+    "xs:dateTime": null,
+    "string": null,
+    "integer": null,
+    "int": null,
+    "long": null,
+    "short": null,
+    "byte": null,
+    "decimal": null,
+    "float": null,
+    "double": null,
+    "boolean": null,
+    "date": null,
+    "time": null,
+    "dateTime": null
+  };
+  if (typeName in builtInTypes) {
+    return builtInTypes[typeName];
+  }
+  const typeDefinition = xmlDoc.querySelector(
+    `complexType[name="${typeName}"], xs\\:complexType[name="${typeName}"]`
+  );
+  if (typeDefinition) {
+    return parseComplexType(typeDefinition, xmlDoc);
+  }
+  return null;
+}
+
+// src/lib/models/xml-parameter.ts
+var _XmlParameter = class _XmlParameter {
+  /**
+   * Creates a new XmlParameter instance
+   *
+   * @param name - Parameter name (e.g., 'pSampleXml')
+   * @param template - Object template representing the XML structure
+   * @param direction - Parameter direction (default: 'In')
+   *
+   * @example
+   * ```typescript
+   * const param = new XmlParameter('pDeudor', {
+   *   deudor: {
+   *     datosPersonales: {
+   *       id: null,
+   *       nombre: null
+   *     },
+   *     contactos: {
+   *       contacto: []
+   *     }
+   *   }
+   * }, 'In')
+   *
+   * // Direct property access via Proxy
+   * param.deudor.datosPersonales.nombre = 'Juan Perez'
+   * ```
+   */
+  constructor(name, template, direction = "In") {
+    this._type = "Xml";
+    this._name = name;
+    this._data = this._deepClone(template);
+    this._direction = direction;
+    this._originalTemplate = this._deepClone(template);
+    this[_XmlParameter.TYPE_SYMBOL] = true;
+    return new Proxy(this, {
+      get(target, prop) {
+        if (prop in target) {
+          return target[prop];
+        }
+        if (prop in target._data) {
+          return target._data[prop];
+        }
+        return void 0;
+      },
+      set(target, prop, value) {
+        if (typeof prop === "string" && prop.startsWith("_")) {
+          ;
+          target[prop] = value;
+          return true;
+        }
+        if (prop in target) {
+          return false;
+        }
+        if (typeof prop === "string") {
+          target._data[prop] = value;
+          return true;
+        }
+        return false;
+      },
+      has(target, prop) {
+        return prop in target || prop in target._data;
+      },
+      ownKeys(target) {
+        return [...Reflect.ownKeys(target), ...Object.keys(target._data)];
+      },
+      getOwnPropertyDescriptor(target, prop) {
+        if (prop in target._data) {
+          return {
+            enumerable: true,
+            configurable: true,
+            value: target._data[prop]
+          };
+        }
+        return Reflect.getOwnPropertyDescriptor(target, prop);
+      }
+    });
+  }
+  /**
+   * Converts XmlParameter to IParameter format for ProcessService
+   *
+   * @returns IParameter object ready to send to Bizuit API
+   */
+  toParameter() {
+    return {
+      name: this._name,
+      value: this._data,
+      type: this._type,
+      direction: this._direction
+    };
+  }
+  /**
+   * Gets the parameter name
+   */
+  getName() {
+    return this._name;
+  }
+  /**
+   * Gets the raw data object
+   */
+  getData() {
+    return this._data;
+  }
+  /**
+   * Gets the parameter direction
+   */
+  getDirection() {
+    return this._direction;
+  }
+  /**
+   * Resets the parameter data to the original template
+   */
+  reset() {
+    this._data = this._deepClone(this._originalTemplate);
+  }
+  /**
+   * Creates a deep clone of the XmlParameter
+   *
+   * @returns New XmlParameter instance with cloned data
+   */
+  clone() {
+    return new _XmlParameter(this._name, this._deepClone(this._data), this._direction);
+  }
+  /**
+   * Converts the parameter data to JSON string
+   */
+  toJSON() {
+    return JSON.stringify(this._data, null, 2);
+  }
+  /**
+   * Merges data from another object into this XmlParameter
+   *
+   * @param data - Object or XmlParameter to merge
+   * @param deep - Deep merge (default: true)
+   *
+   * @example
+   * ```typescript
+   * const param = new XmlParameter('pData', { raiz: { nombre: null, edad: null } })
+   * param.merge({ raiz: { nombre: 'Juan' } })
+   * // Result: { raiz: { nombre: 'Juan', edad: null } }
+   * ```
+   */
+  merge(data, deep = true) {
+    const sourceData = _XmlParameter.isXmlParameter(data) ? data.getData() : data;
+    if (deep) {
+      this._data = this._deepMerge(this._data, sourceData);
+    } else {
+      this._data = { ...this._data, ...sourceData };
+    }
+  }
+  /**
+   * Validates that all required fields have values (not null/undefined)
+   *
+   * @param schema - Optional schema object defining required fields
+   * @returns Array of missing field paths
+   *
+   * @example
+   * ```typescript
+   * const param = new XmlParameter('pData', { raiz: { nombre: null, edad: 30 } })
+   * param.raiz.nombre = 'Juan'
+   * const missing = param.validate()
+   * // Returns: [] (all fields filled)
+   *
+   * param.raiz.nombre = null
+   * const missing2 = param.validate()
+   * // Returns: ['raiz.nombre'] (missing field)
+   * ```
+   */
+  validate(schema) {
+    const missingFields = [];
+    const checkObject = (obj, path = "") => {
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          const value = obj[key];
+          const currentPath = path ? `${path}.${key}` : key;
+          if (value === null || value === void 0) {
+            missingFields.push(currentPath);
+          } else if (typeof value === "object" && !Array.isArray(value)) {
+            checkObject(value, currentPath);
+          } else if (Array.isArray(value) && value.length === 0) {
+            missingFields.push(currentPath);
+          }
+        }
+      }
+    };
+    checkObject(this._data);
+    return missingFields;
+  }
+  /**
+   * Fills the parameter with data from a source object
+   * Useful for mapping form data to parameter structure
+   *
+   * @param source - Source data object
+   * @param mapping - Optional field mapping { sourceField: targetPath }
+   *
+   * @example
+   * ```typescript
+   * const param = new XmlParameter('pDeudor', {
+   *   Deudor: { ID: null, Nombre: null, Contactos: { Contacto: [] } }
+   * })
+   *
+   * param.fillFrom(
+   *   { id: 123, nombre: 'Juan', email: 'juan@example.com' },
+   *   {
+   *     id: 'Deudor.ID',
+   *     nombre: 'Deudor.Nombre',
+   *     email: 'Deudor.Contactos.Contacto[0].Valor'
+   *   }
+   * )
+   * ```
+   */
+  fillFrom(source, mapping) {
+    if (!mapping) {
+      this._data = this._deepClone(source);
+      return;
+    }
+    for (const sourceKey in mapping) {
+      if (Object.prototype.hasOwnProperty.call(source, sourceKey)) {
+        const targetPath = mapping[sourceKey];
+        const value = source[sourceKey];
+        this._setByPath(targetPath, value);
+      }
+    }
+  }
+  /**
+   * Gets a value by path (dot notation)
+   *
+   * @param path - Path in dot notation (e.g., 'raiz.productos.producto[0].codigo')
+   * @returns Value at path or undefined
+   */
+  getByPath(path) {
+    return this._getByPath(this._data, path);
+  }
+  /**
+   * Sets a value by path (dot notation)
+   *
+   * @param path - Path in dot notation
+   * @param value - Value to set
+   */
+  setByPath(path, value) {
+    this._setByPath(path, value);
+  }
+  /**
+   * Deep clone helper
+   */
+  _deepClone(obj) {
+    if (obj === null || typeof obj !== "object") {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this._deepClone(item));
+    }
+    const cloned = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        cloned[key] = this._deepClone(obj[key]);
+      }
+    }
+    return cloned;
+  }
+  /**
+   * Deep merge helper
+   */
+  _deepMerge(target, source) {
+    if (source === null || source === void 0) {
+      return target;
+    }
+    if (typeof source !== "object" || Array.isArray(source)) {
+      return source;
+    }
+    const result = this._deepClone(target);
+    for (const key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])) {
+          result[key] = this._deepMerge(result[key] || {}, source[key]);
+        } else {
+          result[key] = source[key];
+        }
+      }
+    }
+    return result;
+  }
+  /**
+   * Get value by path helper
+   */
+  _getByPath(obj, path) {
+    const parts = path.replace(/\[(\d+)\]/g, ".$1").split(".");
+    let current = obj;
+    for (const part of parts) {
+      if (current === null || current === void 0) {
+        return void 0;
+      }
+      current = current[part];
+    }
+    return current;
+  }
+  /**
+   * Set value by path helper
+   */
+  _setByPath(path, value) {
+    const parts = path.replace(/\[(\d+)\]/g, ".$1").split(".");
+    let current = this._data;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      const nextPart = parts[i + 1];
+      if (!(part in current)) {
+        current[part] = /^\d+$/.test(nextPart) ? [] : {};
+      }
+      current = current[part];
+    }
+    const lastPart = parts[parts.length - 1];
+    current[lastPart] = value;
+  }
+  /**
+   * Static helper to check if an object is an XmlParameter instance
+   *
+   * @param obj - Object to check
+   * @returns true if obj is an XmlParameter instance
+   */
+  static isXmlParameter(obj) {
+    if (!obj || typeof obj !== "object") {
+      return false;
+    }
+    return _XmlParameter.TYPE_SYMBOL in obj;
+  }
+};
+/**
+ * Symbol used to identify XmlParameter instances
+ * Used by ProcessService for auto-detection
+ */
+_XmlParameter.TYPE_SYMBOL = Symbol("BizuitXmlParameter");
+var XmlParameter = _XmlParameter;
+function isXmlParameter(obj) {
+  return XmlParameter.isXmlParameter(obj);
+}
 
 // src/lib/api/process-service.ts
 var BizuitProcessService = class {
@@ -453,9 +961,29 @@ var BizuitProcessService = class {
     if (token) {
       headers["Authorization"] = token;
     }
+    const processedParameters = (params.parameters || []).map((param) => {
+      if (XmlParameter.isXmlParameter(param)) {
+        const iParam = param.toParameter();
+        const xmlString = jsonToXml(iParam.value);
+        console.log(`\u2705 Auto-converted XmlParameter "${iParam.name}" to XML`);
+        return {
+          ...iParam,
+          value: xmlString
+        };
+      }
+      if (param.type === "Xml" && typeof param.value === "object" && param.value !== null) {
+        const xmlString = jsonToXml(param.value);
+        console.log(`\u2705 Auto-converted parameter "${param.name}" from object to XML`);
+        return {
+          ...param,
+          value: xmlString
+        };
+      }
+      return param;
+    });
     const payload = {
       eventName: params.processName,
-      parameters: params.parameters || []
+      parameters: processedParameters
     };
     if (params.instanceId) {
       payload.instanceId = params.instanceId;
@@ -596,9 +1124,29 @@ var BizuitProcessService = class {
     if (token) {
       headers["Authorization"] = token;
     }
+    const processedParameters = (params.parameters || []).map((param) => {
+      if (XmlParameter.isXmlParameter(param)) {
+        const iParam = param.toParameter();
+        const xmlString = jsonToXml(iParam.value);
+        console.log(`\u2705 Auto-converted XmlParameter "${iParam.name}" to XML`);
+        return {
+          ...iParam,
+          value: xmlString
+        };
+      }
+      if (param.type === "Xml" && typeof param.value === "object" && param.value !== null) {
+        const xmlString = jsonToXml(param.value);
+        console.log(`\u2705 Auto-converted parameter "${param.name}" from object to XML`);
+        return {
+          ...param,
+          value: xmlString
+        };
+      }
+      return param;
+    });
     const payload = {
       eventName: params.processName,
-      parameters: params.parameters || [],
+      parameters: processedParameters,
       instanceId: params.instanceId
     };
     if (params.processVersion) {
@@ -639,6 +1187,65 @@ var BizuitProcessService = class {
       if (result.tyconParameters) {
         result.parameters = parametersArray;
       }
+    }
+    return result;
+  }
+  /**
+   * Get process parameters as XmlParameter objects (NEW in v2.1.0)
+   *
+   * Returns parameters wrapped in XmlParameter instances, allowing direct property access:
+   *
+   * @example
+   * ```typescript
+   * const params = await sdk.process.getParametersAsObjects({
+   *   processName: 'MyProcess',
+   *   token: authToken
+   * })
+   *
+   * // Direct property modification via Proxy
+   * params.pSampleXml.nodo1 = 'a'
+   * params.pSampleXml.productos[0].codigo = 'ABC'
+   *
+   * // Send directly to process
+   * await sdk.process.start({
+   *   processName: 'MyProcess',
+   *   parameters: [params.pSampleXml]  // SDK auto-converts
+   * }, [], token)
+   * ```
+   *
+   * @param params - Initialize parameters (processName, version, etc.)
+   * @returns Object with parameter names as keys, XmlParameter instances as values
+   */
+  async getParametersAsObjects(params) {
+    const processData = await this.initialize(params);
+    const result = {};
+    if (processData.parameters && Array.isArray(processData.parameters)) {
+      processData.parameters.forEach((param) => {
+        if (param.parameterType === 2 || param.parameterType === "Xml") {
+          const paramName = param.name;
+          let direction = "In";
+          if (param.parameterDirection === 2 || param.parameterDirection === "Out") {
+            direction = "Out";
+          } else if (param.parameterDirection === 3 || param.parameterDirection === "InOut") {
+            direction = "InOut";
+          }
+          let template = {};
+          if (param.schema && typeof param.schema === "string") {
+            try {
+              template = parseXsdToTemplate(param.schema);
+              console.log(`\u2705 Generated template from XSD for parameter: ${paramName}`);
+            } catch (error) {
+              console.warn(`\u26A0\uFE0F Failed to parse XSD for ${paramName}, using empty template:`, error);
+              template = {};
+            }
+          } else {
+            console.log(`\u2139\uFE0F No XSD schema for parameter ${paramName}, using empty template`);
+            template = {};
+          }
+          const xmlParam = new XmlParameter(paramName, template, direction);
+          result[paramName] = xmlParam;
+        }
+      });
     }
     return result;
   }
@@ -1575,6 +2182,7 @@ export {
   BizuitSDK,
   ParameterParser,
   VERSION,
+  XmlParameter,
   buildLoginRedirectUrl,
   buildParameters,
   createAuthFromUrlToken,
@@ -1587,10 +2195,13 @@ export {
   getParameterTypeLabel,
   handleError,
   isParameterRequired,
+  isXmlParameter,
+  jsonToXml,
   loadInstanceDataForContinue,
   mergeParameters,
   parametersToFormData,
   parseBizuitUrlParam,
+  parseXsdToTemplate,
   processUrlToken,
   releaseInstanceLock,
   xmlToJson

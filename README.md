@@ -12,6 +12,7 @@ Core SDK for Bizuit BPM form integration. Provides authentication, process manag
 - ✅ **Server-Side Support** - Works in Next.js API routes, server components, and Node.js (v1.5.0+)
 - ✅ **Simplified Configuration** - Single `apiUrl` parameter instead of separate endpoints (v2.0.0+)
 - ✅ **Complex Parameters** - Handle scalar and complex (JSON/XML) parameters
+- ✅ **Automatic XML Conversion** - Pass JavaScript objects for XML parameters, auto-converted to XML (v2.1.0+)
 - ✅ **Error Handling** - Comprehensive error handling and logging
 
 ## Installation
@@ -415,6 +416,124 @@ return (
 ```
 
 [See live example →](https://github.com/TYCON-SA/bizuit-custom-form-sample/tree/main/example/app/example-2-manual-all)
+
+---
+
+## Working with XML Parameters ✨ NEW in v2.1.0
+
+The SDK now automatically converts JavaScript objects to XML for parameters with `type: 'Xml'`. This makes working with complex XML structures much easier and less error-prone.
+
+### BEFORE (Manual XML Construction) ❌
+
+```typescript
+const xmlData = `<raiz>
+  <productos>
+    <producto>
+      <codigo>PROD001</codigo>
+      <descripcion>Producto 1</descripcion>
+    </producto>
+  </productos>
+</raiz>`
+
+await sdk.process.start({
+  processName: 'MyProcess',
+  parameters: [{
+    name: 'xmlParam',
+    value: xmlData,  // XML string
+    type: 'Xml',
+    direction: 'In'
+  }]
+}, [], token)
+```
+
+### AFTER (Object-Based) ✅
+
+```typescript
+const productosData = {
+  raiz: {
+    productos: {
+      producto: [
+        { codigo: 'PROD001', descripcion: 'Producto 1' },
+        { codigo: 'PROD002', descripcion: 'Producto 2' }
+      ]
+    }
+  }
+}
+
+await sdk.process.start({
+  processName: 'MyProcess',
+  parameters: [{
+    name: 'xmlParam',
+    value: productosData,  // JavaScript object!
+    type: 'Xml',
+    direction: 'In'
+  }]
+}, [], token)
+// SDK automatically converts to XML! ✨
+```
+
+### Benefits
+
+1. **Type Safety** - Work with typed objects instead of strings
+2. **IntelliSense** - Get autocomplete in your IDE
+3. **Less Errors** - No XML syntax mistakes
+4. **Easier Testing** - Test with objects, not XML strings
+5. **Symmetrical** - Input and output both use objects
+6. **Backward Compatible** - XML strings still work
+
+### Real-World Example
+
+```typescript
+import { useBizuitSDK } from '@tyconsa/bizuit-form-sdk'
+
+function DeudorForm({ formData }) {
+  const sdk = useBizuitSDK()
+  const [token] = useToken()
+
+  const handleSubmit = async () => {
+    // Build XML parameter from form data
+    const deudorData = {
+      deudor: {
+        datosPersonales: {
+          id: formData.id,
+          nombre: formData.nombre,
+          tipoDocumento: formData.tipoDoc,
+          numeroDocumento: formData.nroDoc
+        },
+        contactos: {
+          contacto: formData.contactos.map(c => ({
+            tipo: c.tipo,
+            valor: c.valor
+          }))
+        }
+      }
+    }
+
+    // Invoke process with object
+    const result = await sdk.process.start({
+      processName: 'GestionDeudor',
+      parameters: [
+        {
+          name: 'pDeudor',
+          value: deudorData,  // Object, not XML!
+          type: 'Xml',
+          direction: 'In'
+        }
+      ]
+    }, [], token)
+
+    // Process output parameters (already converted to objects)
+    const outputData = result.parameters.find(p => p.name === 'pResultado')
+    if (outputData && outputData.parameterType === 'Json') {
+      console.log(outputData.value.resultado.mensaje)  // Access as object
+    }
+  }
+
+  return <form onSubmit={handleSubmit}>{/* form fields */}</form>
+}
+```
+
+**For complete documentation, see [XML_PARAMETERS_GUIDE.md](./XML_PARAMETERS_GUIDE.md)**
 
 ---
 
@@ -1030,7 +1149,7 @@ sdk.instanceLock.lock(...)
 
 ## TypeScript Support
 
-All types are exported and available:
+All types and utilities are exported and available:
 
 ```typescript
 import type {
@@ -1043,6 +1162,23 @@ import type {
   ILockStatus,
   // ... and many more
 } from '@bizuit/form-sdk'
+
+// XML/JSON conversion utilities (v2.1.0+)
+import { xmlToJson, jsonToXml } from '@tyconsa/bizuit-form-sdk'
+
+// Example: Manual conversion if needed
+const obj = { raiz: { nombre: 'Test', productos: { producto: [...] } } }
+const xml = jsonToXml(obj)
+console.log(xml)
+// <raiz>
+//   <nombre>Test</nombre>
+//   <productos>
+//     <producto>...</producto>
+//   </productos>
+// </raiz>
+
+const parsed = xmlToJson(xml)
+console.log(parsed)  // Back to object
 ```
 
 ## Error Handling
@@ -1064,6 +1200,22 @@ try {
   }
 }
 ```
+
+## 📚 Documentation
+
+For detailed guides and advanced features:
+
+- **[XmlParameter Guide](./XMLPARAMETER_GUIDE.md)** - Complete guide for working with XML parameters using mutable objects
+  - XSD auto-template generation
+  - Direct property access via Proxy
+  - Advanced helper methods (merge, validate, fillFrom, getByPath, setByPath)
+
+- **[XmlParameter Examples](./EXAMPLES_XMLPARAMETER.md)** - 6 real-world examples showing common patterns:
+  - Simple forms with validation
+  - Complex nested structures
+  - Multi-step forms
+  - Array manipulation
+  - Editing existing instances
 
 ## License
 

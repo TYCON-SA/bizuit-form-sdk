@@ -18,5 +18,8 @@ export * from './lib/api'
 // Utilities (no React dependencies)
 export * from './lib/utils'
 
+// Models (no React dependencies)
+export * from './lib/models'
+
 // Version
 export const VERSION = '1.0.0'

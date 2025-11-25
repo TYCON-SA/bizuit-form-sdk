@@ -16,6 +16,9 @@ export * from './lib/api'
 // Utilities
 export * from './lib/utils'
 
+// Models
+export * from './lib/models'
+
 // React Hooks (client-side only)
 export * from './lib/hooks/useBizuitSDK.tsx'
 export * from './lib/hooks/useAuth.tsx'

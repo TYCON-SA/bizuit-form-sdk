@@ -1,7 +1,7 @@
 /**
- * XML to JSON Converter
- * Automatically converts XML strings to JavaScript objects
- * Used by process-service to parse XML parameters
+ * XML to JSON Converter (bidirectional)
+ * Automatically converts between XML strings and JavaScript objects
+ * Used by process-service to parse/serialize XML parameters
  */
 
 /**
@@ -145,4 +145,135 @@ export function xmlToJson(xmlString: string): any | null {
     console.error('Error converting XML to JSON:', error)
     return null
   }
+}
+
+/**
+ * Converts a JavaScript object to an XML string
+ * This is the inverse operation of xmlToJson()
+ *
+ * @param obj - The JavaScript object to convert
+ * @param options - Conversion options
+ * @returns XML string representation of the object
+ *
+ * @example
+ * ```typescript
+ * const obj = {
+ *   raiz: {
+ *     nombre: "Test",
+ *     productos: {
+ *       producto: [
+ *         { codigo: "PROD001", descripcion: "Producto 1" },
+ *         { codigo: "PROD002", descripcion: "Producto 2" }
+ *       ]
+ *     }
+ *   }
+ * }
+ *
+ * const xml = jsonToXml(obj)
+ * // <raiz>
+ * //   <nombre>Test</nombre>
+ * //   <productos>
+ * //     <producto>
+ * //       <codigo>PROD001</codigo>
+ * //       <descripcion>Producto 1</descripcion>
+ * //     </producto>
+ * //     <producto>
+ * //       <codigo>PROD002</codigo>
+ * //       <descripcion>Producto 2</descripcion>
+ * //     </producto>
+ * //   </productos>
+ * // </raiz>
+ * ```
+ */
+export function jsonToXml(
+  obj: any,
+  options: { indent?: number; currentIndent?: number } = {}
+): string {
+  const { indent = 2, currentIndent = 0 } = options
+
+  try {
+    // Handle null/undefined
+    if (obj === null || obj === undefined) {
+      return ''
+    }
+
+    // Handle primitive values
+    if (typeof obj !== 'object') {
+      return String(obj)
+    }
+
+    // Get the root key
+    const keys = Object.keys(obj)
+    if (keys.length === 0) {
+      return ''
+    }
+
+    const rootKey = keys[0]
+    const rootValue = obj[rootKey]
+
+    // Build XML recursively
+    return buildXmlNode(rootKey, rootValue, indent, currentIndent)
+  } catch (error) {
+    console.error('Error converting JSON to XML:', error)
+    return ''
+  }
+}
+
+/**
+ * Recursively builds an XML node from a JavaScript value
+ */
+function buildXmlNode(
+  tagName: string,
+  value: any,
+  indent: number,
+  currentIndent: number
+): string {
+  const indentStr = ' '.repeat(currentIndent)
+  const childIndentStr = ' '.repeat(currentIndent + indent)
+
+  // Handle null/undefined
+  if (value === null || value === undefined) {
+    return `${indentStr}<${tagName}></${tagName}>`
+  }
+
+  // Handle primitive values (string, number, boolean)
+  if (typeof value !== 'object') {
+    return `${indentStr}<${tagName}>${escapeXml(String(value))}</${tagName}>`
+  }
+
+  // Handle arrays
+  if (Array.isArray(value)) {
+    // For arrays, each item gets the same tag name
+    return value
+      .map(item => buildXmlNode(tagName, item, indent, currentIndent))
+      .join('\n')
+  }
+
+  // Handle objects
+  const childKeys = Object.keys(value)
+
+  if (childKeys.length === 0) {
+    return `${indentStr}<${tagName}></${tagName}>`
+  }
+
+  const childNodes = childKeys
+    .map(key => {
+      const childValue = value[key]
+      return buildXmlNode(key, childValue, indent, currentIndent + indent)
+    })
+    .join('\n')
+
+  return `${indentStr}<${tagName}>\n${childNodes}\n${indentStr}</${tagName}>`
+}
+
+/**
+ * Escapes special XML characters
+ */
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
 }
