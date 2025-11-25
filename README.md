@@ -533,7 +533,63 @@ function DeudorForm({ formData }) {
 }
 ```
 
-**For complete documentation, see [XML_PARAMETERS_GUIDE.md](./XML_PARAMETERS_GUIDE.md)**
+### NEW in v2.1.0: XmlParameter - Work with XML as Mutable Objects
+
+Instead of building XML strings manually, use the `XmlParameter` class for a superior developer experience:
+
+```typescript
+import { XmlParameter, parseXsdToTemplate } from '@tyconsa/bizuit-form-sdk'
+
+// Method 1: Using getParametersAsObjects() (recommended if Initialize endpoint available)
+const params = await sdk.process.getParametersAsObjects({
+  processName: 'MyProcess',
+  token
+})
+
+// Direct property access via Proxy
+params.pProductos.raiz.productos.producto[0] = {
+  codigo: 'PROD001',
+  descripcion: 'Producto 1'
+}
+
+// Method 2: Manual creation from getParameters() (if Initialize not available)
+const paramDefs = await sdk.process.getParameters('MyProcess', '', token)
+const xmlParamDef = paramDefs.find(p => p.name === 'pProductos')
+
+// Parse XSD to generate template
+const template = parseXsdToTemplate(xmlParamDef.schema)
+const xmlParam = new XmlParameter('pProductos', template, 'In')
+
+// Fill data using helper methods
+xmlParam.fillFrom(formData, {
+  codigo: 'raiz.productos.producto[0].codigo',
+  descripcion: 'raiz.productos.producto[0].descripcion'
+})
+
+// Validate before sending
+const missing = xmlParam.validate()
+if (missing.length > 0) {
+  console.error('Missing fields:', missing)
+  return
+}
+
+// Send (SDK auto-detects XmlParameter and converts to XML)
+await sdk.process.start({
+  processName: 'MyProcess',
+  parameters: [xmlParam]  // ← Auto-converted to XML
+}, [], token)
+```
+
+**XmlParameter Features:**
+- ✅ Auto-template generation from XSD schema
+- ✅ Direct property access via JavaScript Proxy
+- ✅ Helper methods: `merge()`, `validate()`, `fillFrom()`, `getByPath()`, `setByPath()`
+- ✅ Auto-detection and XML conversion
+- ✅ Full TypeScript support
+
+**For complete documentation:**
+- [XmlParameter Guide](./XMLPARAMETER_GUIDE.md) - Complete technical guide
+- [XmlParameter Examples](./EXAMPLES_XMLPARAMETER.md) - 6 real-world examples
 
 ---
 
