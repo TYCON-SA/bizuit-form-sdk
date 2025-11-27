@@ -1,74 +1,46 @@
 # Example 7: DataService Queries
 
+This example demonstrates how to use the DataService API to fetch lookup data, lists, and reports from BIZUIT Dashboard.
+
 ## Overview
 
-Use the DataService API to fetch lookup data, lists, and query results from BIZUIT Dashboard without creating dedicated processes.
+The DataService API provides three ways to execute queries, each with different levels of developer experience:
 
-**Use Cases:**
-- Combo box data (rejection types, status lists, etc.)
-- Reference tables (countries, categories, etc.)
-- Read-only reports and dashboards
-- Autocomplete suggestions
+1. **`execute()`** - Execute by numeric ID (legacy)
+2. **`executeByName()`** - Execute by page ID + DataService name
+3. **`executeByPageAndName()`** ⭐ **RECOMMENDED** - Execute by page name + DataService name
 
-**Benefits:**
-- No need to create BIZUIT processes for simple queries
-- Reuse existing DataServices across forms and processes
-- Performance optimized with caching
-- Clean separation: queries ≠ business processes
-
----
-
-## Basic DataService Query
-
-### Simple Example: Get Rejection Types
+## Method 1: Execute by ID (Legacy)
 
 ```typescript
 import { useBizuitSDK } from '@tyconsa/bizuit-form-sdk'
 
-interface RejectionType {
-  id: number
-  code: string
-  description: string
-  isActive: boolean
-}
-
-function RejectionTypeSelector() {
+function RejectionTypeCombo() {
   const sdk = useBizuitSDK()
-  const [rejectionTypes, setRejectionTypes] = useState<RejectionType[]>([])
-  const [loading, setLoading] = useState(false)
+  const [options, setOptions] = useState([])
 
   useEffect(() => {
-    loadRejectionTypes()
-  }, [])
+    async function loadData() {
+      const token = 'your-auth-token'
 
-  async function loadRejectionTypes() {
-    setLoading(true)
-    try {
-      // DataService ID 42 returns rejection types
-      const result = await sdk.dataService.execute<RejectionType>({
+      // ❌ Hard to maintain - what is ID 42?
+      const result = await sdk.dataService.execute({
         id: 42,
-        parameters: [
-          { name: 'status', value: 'active' }
-        ]
+        parameters: []
       }, token)
 
       if (result.success) {
-        setRejectionTypes(result.data)
-      } else {
-        console.error('Failed to load rejection types:', result.errorMessage)
+        setOptions(result.data)
       }
-    } catch (error) {
-      console.error('Error loading rejection types:', error)
-    } finally {
-      setLoading(false)
     }
-  }
+    loadData()
+  }, [])
 
   return (
     <select>
-      {rejectionTypes.map(type => (
-        <option key={type.id} value={type.id}>
-          {type.code} - {type.description}
+      {options.map(opt => (
+        <option key={opt.id} value={opt.id}>
+          {opt.name}
         </option>
       ))}
     </select>
@@ -76,418 +48,387 @@ function RejectionTypeSelector() {
 }
 ```
 
----
+**Problems:**
+- ❌ Magic number `42` - what does it mean?
+- ❌ ID may differ across environments (dev/qa/prod)
+- ❌ Hard to maintain and understand
 
-## Query with Multiple Parameters
-
-### Example: Customer Orders Lookup
-
-```typescript
-interface Order {
-  orderId: number
-  customerId: string
-  orderDate: string
-  totalAmount: number
-  status: string
-}
-
-async function loadCustomerOrders(customerId: string, year: number) {
-  const result = await sdk.dataService.execute<Order>({
-    id: 4, // DataService ID for customer orders
-    parameters: [
-      { name: 'customerId', value: customerId },
-      { name: 'year', value: year },
-      { name: 'includeDetails', value: true }
-    ],
-    withoutCache: false // Use cache if available
-  }, token)
-
-  if (result.success) {
-    console.log(`Found ${result.data.length} orders`)
-    return result.data
-  } else {
-    throw new Error(result.errorMessage)
-  }
-}
-```
-
----
-
-## Multiple DataServices in Parallel
-
-### Example: Load All Combo Data at Once
+## Method 2: Execute by Name (Better)
 
 ```typescript
-interface ComboData {
-  rejectionTypes: RejectionType[]
-  statusList: Status[]
-  priorities: Priority[]
+import { useBizuitSDK } from '@tyconsa/bizuit-form-sdk'
+
+interface RejectionType {
+  ParameterId: number
+  ParameterName: string
+  TypeId: number
 }
 
-async function loadAllComboData(token: string): Promise<ComboData> {
-  // Execute 3 DataServices in parallel
-  const [rejectionResult, statusResult, priorityResult] =
-    await sdk.dataService.executeMany([
-      { id: 42, parameters: [] }, // Rejection types
-      { id: 43, parameters: [] }, // Status list
-      { id: 44, parameters: [] }  // Priorities
-    ], token)
-
-  return {
-    rejectionTypes: rejectionResult.success ? rejectionResult.data : [],
-    statusList: statusResult.success ? statusResult.data : [],
-    priorities: priorityResult.success ? priorityResult.data : []
-  }
-}
-
-// Usage
-function MyForm() {
-  const [comboData, setComboData] = useState<ComboData>()
-  const [loading, setLoading] = useState(true)
+function RejectionTypeCombo() {
+  const sdk = useBizuitSDK()
+  const [options, setOptions] = useState<RejectionType[]>([])
 
   useEffect(() => {
-    loadAllComboData(token).then(data => {
-      setComboData(data)
-      setLoading(false)
-    })
+    async function loadData() {
+      const token = 'your-auth-token'
+
+      // ✅ Better - descriptive name
+      const result = await sdk.dataService.executeByName<RejectionType>({
+        tabModuleId: 1018,                     // Still a magic number
+        dataServiceName: 'Motivos de Rechazo', // But name is clear!
+        parameters: []
+      }, token)
+
+      if (result.success) {
+        setOptions(result.data)
+      } else {
+        console.error('Error:', result.errorMessage)
+      }
+    }
+    loadData()
   }, [])
 
-  if (loading) return <div>Loading...</div>
-
   return (
-    <div>
-      <select>
-        {comboData?.rejectionTypes.map(type => (
-          <option key={type.id} value={type.id}>{type.description}</option>
-        ))}
-      </select>
-
-      <select>
-        {comboData?.statusList.map(status => (
-          <option key={status.id} value={status.id}>{status.name}</option>
-        ))}
-      </select>
-    </div>
+    <select>
+      {options.map(opt => (
+        <option key={opt.ParameterId} value={opt.ParameterId}>
+          {opt.ParameterName}
+        </option>
+      ))}
+    </select>
   )
 }
 ```
 
----
+**Benefits:**
+- ✅ Self-documenting - "Motivos de Rechazo"
+- ✅ Still has magic number for page ID
+- ⚠️ Need to know tabModuleId
 
-## Force Fresh Query (Skip Cache)
-
-### Example: Real-time Dashboard
-
-```typescript
-async function loadRealtimeDashboard() {
-  // Force fresh query every time
-  const result = await sdk.dataService.execute({
-    id: 100, // Dashboard stats DataService
-    parameters: [
-      { name: 'dateFrom', value: '2024-01-01' },
-      { name: 'dateTo', value: '2024-12-31' }
-    ],
-    withoutCache: true // ⚠️ Skip cache - always fresh data
-  }, token)
-
-  return result.data
-}
-```
-
----
-
-## Using createParameters Helper
-
-### Example: Dynamic Filter Builder
-
-```typescript
-function buildDynamicQuery(filters: Record<string, any>) {
-  // Convert object to parameters array
-  const paramArray = Object.entries(filters).map(([name, value]) => ({
-    name,
-    value
-  }))
-
-  const params = sdk.dataService.createParameters(paramArray)
-
-  return sdk.dataService.execute({
-    id: 50,
-    parameters: params
-  }, token)
-}
-
-// Usage
-const result = await buildDynamicQuery({
-  customerId: 'ALFKI',
-  orderStatus: 'Pending',
-  year: 2024
-})
-```
-
----
-
-## Error Handling Best Practices
-
-### Example: Robust Query with Retry
-
-```typescript
-async function loadDataWithRetry<T>(
-  dataServiceId: number,
-  parameters: any[],
-  token: string,
-  maxRetries = 3
-): Promise<T[]> {
-  let lastError: string | undefined
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const result = await sdk.dataService.execute<T>({
-        id: dataServiceId,
-        parameters
-      }, token)
-
-      if (result.success) {
-        return result.data
-      }
-
-      lastError = result.errorMessage
-      console.warn(`Attempt ${attempt} failed:`, lastError)
-
-      // Wait before retry (exponential backoff)
-      if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, attempt * 1000))
-      }
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : 'Unknown error'
-      console.error(`Attempt ${attempt} threw error:`, error)
-    }
-  }
-
-  throw new Error(`Failed after ${maxRetries} attempts: ${lastError}`)
-}
-
-// Usage
-try {
-  const data = await loadDataWithRetry<RejectionType>(42, [], token)
-  console.log('Data loaded successfully:', data)
-} catch (error) {
-  console.error('Could not load data:', error)
-  // Show user-friendly error message
-}
-```
-
----
-
-## Complete Form Example
-
-### Example: Invoice Approval Form with Lookups
+## Method 3: Execute by Page Name + DataService Name ⭐ RECOMMENDED
 
 ```typescript
 import { useBizuitSDK } from '@tyconsa/bizuit-form-sdk'
-import { BizuitCombo } from '@tyconsa/bizuit-ui-components'
-
-interface InvoiceFormData {
-  invoiceNumber: string
-  supplierId: number
-  rejectionTypeId?: number
-  statusId: number
-  amount: number
-}
-
-interface Supplier {
-  id: number
-  name: string
-  taxId: string
-}
 
 interface RejectionType {
-  id: number
-  code: string
-  description: string
+  ParameterId: number
+  ParameterName: string
+  TypeId: number
 }
 
-function InvoiceApprovalForm({ token }: { token: string }) {
+function RejectionTypeCombo() {
   const sdk = useBizuitSDK()
+  const [options, setOptions] = useState<RejectionType[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const [formData, setFormData] = useState<InvoiceFormData>({
-    invoiceNumber: '',
-    supplierId: 0,
-    statusId: 1,
-    amount: 0
-  })
-
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [rejectionTypes, setRejectionTypes] = useState<RejectionType[]>([])
-  const [loading, setLoading] = useState(true)
-
-  // Load combo data on mount
   useEffect(() => {
-    loadComboData()
+    async function loadData() {
+      setLoading(true)
+      setError(null)
+
+      const token = 'your-auth-token'
+
+      // 🎯 BEST - Zero magic numbers!
+      const result = await sdk.dataService.executeByPageAndName<RejectionType>({
+        pageName: 'DataService',              // Human-readable page name
+        dataServiceName: 'GetParametersByType', // DataService name from grid.title
+        parameters: [
+          { name: 'typename', value: 'Motivos de Rechazo' }
+        ]
+      }, token)
+
+      setLoading(false)
+
+      if (result.success) {
+        setOptions(result.data)
+      } else {
+        // Handle different error types
+        if (result.errorType === 'PAGE_NOT_FOUND') {
+          setError('User does not have access to this page')
+        } else if (result.errorType === 'NO_MODULES_FOUND') {
+          setError('Page has no DataServices configured')
+        } else if (result.errorType === 'DS_NOT_FOUND') {
+          setError('DataService not found in page')
+        } else {
+          setError(result.errorMessage || 'Unknown error')
+        }
+      }
+    }
+    loadData()
   }, [])
 
-  async function loadComboData() {
-    setLoading(true)
-    try {
-      // Load suppliers and rejection types in parallel
-      const [suppliersResult, rejectionsResult] =
-        await sdk.dataService.executeMany([
-          { id: 101, parameters: [{ name: 'active', value: true }] }, // Suppliers
-          { id: 42, parameters: [{ name: 'status', value: 'active' }] }  // Rejections
-        ], token)
-
-      if (suppliersResult.success) {
-        setSuppliers(suppliersResult.data)
-      }
-
-      if (rejectionsResult.success) {
-        setRejectionTypes(rejectionsResult.data)
-      }
-    } catch (error) {
-      console.error('Error loading combo data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleSubmit() {
-    // Submit invoice via process
-    const result = await sdk.process.raiseEvent({
-      processName: 'InvoiceApproval',
-      activityName: 'SubmitInvoice',
-      additionalParameters: sdk.process.createParameters([
-        { name: 'pInvoiceNumber', value: formData.invoiceNumber },
-        { name: 'pSupplierId', value: formData.supplierId },
-        { name: 'pRejectionTypeId', value: formData.rejectionTypeId },
-        { name: 'pAmount', value: formData.amount }
-      ])
-    }, [], token)
-
-    if (result.success) {
-      console.log('Invoice submitted successfully')
-    }
-  }
-
-  if (loading) {
-    return <div>Loading form data...</div>
-  }
+  if (loading) return <div>Loading...</div>
+  if (error) return <div>Error: {error}</div>
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); handleSubmit() }}>
-      <input
-        type="text"
-        placeholder="Invoice Number"
-        value={formData.invoiceNumber}
-        onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
-      />
+    <select>
+      {options.map(opt => (
+        <option key={opt.ParameterId} value={opt.ParameterId}>
+          {opt.ParameterName}
+        </option>
+      ))}
+    </select>
+  )
+}
+```
 
-      <BizuitCombo
-        label="Supplier"
-        value={formData.supplierId}
-        options={suppliers.map(s => ({ value: s.id, label: `${s.name} (${s.taxId})` }))}
-        onChange={(value) => setFormData({ ...formData, supplierId: value as number })}
-      />
+**Benefits:**
+- ✅ **ZERO magic numbers** - everything is descriptive
+- ✅ **Self-documenting** - code reads like English
+- ✅ **Environment-portable** - same names work everywhere
+- ✅ **Automatic security** - only accessible pages returned
+- ✅ **Copy-paste friendly** - easy to share across team
 
-      <BizuitCombo
-        label="Rejection Type (Optional)"
-        value={formData.rejectionTypeId}
-        options={rejectionTypes.map(r => ({ value: r.id, label: `${r.code} - ${r.description}` }))}
-        onChange={(value) => setFormData({ ...formData, rejectionTypeId: value as number })}
-        clearable
-      />
+## Complete Example: Form with Multiple Lookups
 
-      <input
-        type="number"
-        placeholder="Amount"
-        value={formData.amount}
-        onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
-      />
+```typescript
+import { useBizuitSDK } from '@tyconsa/bizuit-form-sdk'
+import { useState, useEffect } from 'react'
 
-      <button type="submit">Submit Invoice</button>
+interface Parameter {
+  ParameterId: number
+  ParameterName: string
+  TypeId: number
+}
+
+interface FormData {
+  rejectionType: number | null
+  status: number | null
+  priority: number | null
+}
+
+function ExpenseRequestForm() {
+  const sdk = useBizuitSDK()
+  const [formData, setFormData] = useState<FormData>({
+    rejectionType: null,
+    status: null,
+    priority: null
+  })
+
+  const [lookups, setLookups] = useState({
+    rejectionTypes: [] as Parameter[],
+    statuses: [] as Parameter[],
+    priorities: [] as Parameter[]
+  })
+
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadLookups() {
+      const token = 'your-auth-token'
+
+      // Load all lookups in parallel
+      const [rejectionTypes, statuses, priorities] = await sdk.dataService.executeMany([
+        {
+          pageName: 'DataService',
+          dataServiceName: 'GetParametersByType',
+          parameters: [{ name: 'typename', value: 'Motivos de Rechazo' }]
+        },
+        {
+          pageName: 'DataService',
+          dataServiceName: 'GetParametersByType',
+          parameters: [{ name: 'typename', value: 'Estados' }]
+        },
+        {
+          pageName: 'DataService',
+          dataServiceName: 'GetParametersByType',
+          parameters: [{ name: 'typename', value: 'Prioridades' }]
+        }
+      ], token)
+
+      setLookups({
+        rejectionTypes: rejectionTypes.success ? rejectionTypes.data : [],
+        statuses: statuses.success ? statuses.data : [],
+        priorities: priorities.success ? priorities.data : []
+      })
+
+      setLoading(false)
+    }
+
+    loadLookups()
+  }, [])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Submit form with selected values
+    console.log('Form data:', formData)
+  }
+
+  if (loading) return <div>Loading lookups...</div>
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <div>
+        <label>Rejection Type:</label>
+        <select
+          value={formData.rejectionType || ''}
+          onChange={(e) => setFormData({ ...formData, rejectionType: Number(e.target.value) })}
+        >
+          <option value="">Select...</option>
+          {lookups.rejectionTypes.map(opt => (
+            <option key={opt.ParameterId} value={opt.ParameterId}>
+              {opt.ParameterName}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label>Status:</label>
+        <select
+          value={formData.status || ''}
+          onChange={(e) => setFormData({ ...formData, status: Number(e.target.value) })}
+        >
+          <option value="">Select...</option>
+          {lookups.statuses.map(opt => (
+            <option key={opt.ParameterId} value={opt.ParameterId}>
+              {opt.ParameterName}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label>Priority:</label>
+        <select
+          value={formData.priority || ''}
+          onChange={(e) => setFormData({ ...formData, priority: Number(e.target.value) })}
+        >
+          <option value="">Select...</option>
+          {lookups.priorities.map(opt => (
+            <option key={opt.ParameterId} value={opt.ParameterId}>
+              {opt.ParameterName}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <button type="submit">Submit</button>
     </form>
   )
 }
 ```
 
----
-
-## API Reference
-
-### `sdk.dataService.execute<T>(request, token)`
-
-Execute a single DataService query.
-
-**Parameters:**
-- `request.id` (number) - DataService ID from BIZUIT Dashboard
-- `request.parameters` (array) - Query parameters
-- `request.withoutCache` (boolean, optional) - Skip cache (default: false)
-- `request.executeFromGlobal` (boolean, optional) - Execute from global scope (default: false)
-- `token` (string) - Authentication token
-
-**Returns:** `Promise<IDataServiceResponse<T>>`
+## With Custom Hook (Reusable Pattern)
 
 ```typescript
-{
-  success: boolean
-  data: T[]
-  totalCount?: number
-  errorMessage?: string
-  errorType?: string
+import { useBizuitSDK } from '@tyconsa/bizuit-form-sdk'
+import { useState, useEffect } from 'react'
+
+interface UseDataServiceOptions {
+  pageName: string
+  dataServiceName: string
+  parameters?: Array<{ name: string; value: any }>
+  token: string
+}
+
+function useDataService<T = any>(options: UseDataServiceOptions) {
+  const sdk = useBizuitSDK()
+  const [data, setData] = useState<T[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true)
+      setError(null)
+
+      const result = await sdk.dataService.executeByPageAndName<T>({
+        pageName: options.pageName,
+        dataServiceName: options.dataServiceName,
+        parameters: options.parameters || []
+      }, options.token)
+
+      setLoading(false)
+
+      if (result.success) {
+        setData(result.data)
+      } else {
+        setError(result.errorMessage || 'Unknown error')
+      }
+    }
+
+    fetchData()
+  }, [options.pageName, options.dataServiceName, options.token])
+
+  return { data, loading, error }
+}
+
+// Usage:
+function MyForm() {
+  const token = 'your-auth-token'
+
+  const { data: rejectionTypes, loading: loadingRejections } = useDataService({
+    pageName: 'DataService',
+    dataServiceName: 'GetParametersByType',
+    parameters: [{ name: 'typename', value: 'Motivos de Rechazo' }],
+    token
+  })
+
+  if (loadingRejections) return <div>Loading...</div>
+
+  return (
+    <select>
+      {rejectionTypes.map((type: any) => (
+        <option key={type.ParameterId} value={type.ParameterId}>
+          {type.ParameterName}
+        </option>
+      ))}
+    </select>
+  )
 }
 ```
 
----
+## Server-Side Usage (Next.js API Route)
 
-### `sdk.dataService.executeMany<T>(requests, token)`
+```typescript
+// app/api/lookups/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { BizuitSDK } from '@tyconsa/bizuit-form-sdk/core'
 
-Execute multiple DataService queries in parallel.
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
+  const typename = searchParams.get('typename') || 'Motivos de Rechazo'
 
-**Parameters:**
-- `requests` (array) - Array of DataService requests
-- `token` (string) - Authentication token
+  // Initialize SDK (server-side)
+  const sdk = new BizuitSDK({
+    apiUrl: process.env.BIZUIT_API_URL!
+  })
 
-**Returns:** `Promise<IDataServiceResponse<T>[]>`
+  // Get token (from your auth system)
+  const token = 'your-auth-token'
 
----
+  // Execute DataService
+  const result = await sdk.dataService.executeByPageAndName({
+    pageName: 'DataService',
+    dataServiceName: 'GetParametersByType',
+    parameters: [
+      { name: 'typename', value: typename }
+    ]
+  }, token)
 
-### `sdk.dataService.createParameters(params)`
+  if (result.success) {
+    return NextResponse.json({
+      success: true,
+      data: result.data
+    })
+  } else {
+    return NextResponse.json({
+      success: false,
+      error: result.errorMessage
+    }, { status: 500 })
+  }
+}
+```
 
-Helper to create DataService parameters array.
+## Key Takeaways
 
-**Parameters:**
-- `params` (array) - Array of `{ name, value, isGroupBy? }`
-
-**Returns:** `IDataServiceParameter[]`
-
----
-
-## When to Use DataService vs Process
-
-| Scenario | Use DataService | Use Process |
-|----------|----------------|-------------|
-| Combo box data | ✅ Yes | ❌ No |
-| Reference tables | ✅ Yes | ❌ No |
-| Read-only reports | ✅ Yes | ❌ No |
-| Autocomplete | ✅ Yes | ❌ No |
-| Business logic | ❌ No | ✅ Yes |
-| Data updates | ❌ No | ✅ Yes |
-| Workflow steps | ❌ No | ✅ Yes |
-| Audit trail needed | ❌ No | ✅ Yes |
-
----
-
-## Tips & Best Practices
-
-1. **Parallel Loading:** Use `executeMany()` to load multiple combos simultaneously
-2. **Cache Strategy:** Use `withoutCache: false` for reference data, `true` for real-time data
-3. **Error Handling:** Always check `result.success` before using `result.data`
-4. **Type Safety:** Define TypeScript interfaces for your DataService results
-5. **Loading States:** Show loading indicators while fetching combo data
-6. **Retry Logic:** Implement retry for critical lookups (network issues)
-
----
-
-## Next Steps
-
-- [Example 1: Simple Process Start](./example1-simple-start.md)
-- [Example 2: Process with Parameters](./example2-process-with-params.md)
-- [Example 4: Dynamic Forms](./example4-dynamic-form.md)
+1. **Always use `executeByPageAndName()`** for new code - zero magic numbers!
+2. **TypeScript support** - Define your data interfaces for type safety
+3. **Error handling** - Check `errorType` for specific error cases
+4. **Automatic security** - Only accessible pages are returned
+5. **Environment portability** - Same code works across dev/qa/prod
+6. **Custom hooks** - Create reusable patterns for your team
+7. **Server-side support** - Use `/core` export for API routes
