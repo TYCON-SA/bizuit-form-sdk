@@ -63,7 +63,7 @@ export class BizuitDataServiceService {
     }
 
     try {
-      const response = await this.client.post<IDataServiceResponse<T>>(
+      const response = await this.client.post<any>(
         `${this.apiUrl}/Dashboard/DataService/Execute?${queryParams.toString()}`,
         body,
         {
@@ -73,8 +73,28 @@ export class BizuitDataServiceService {
         }
       )
 
+      // Transform gridData structure to flat array of objects
+      let flattenedData: T[] = []
+
+      if (response.gridData && Array.isArray(response.gridData) && response.gridData.length > 0) {
+        const gridTable = response.gridData[0]
+        if (gridTable.rows && Array.isArray(gridTable.rows)) {
+          flattenedData = gridTable.rows.map((row: any) => {
+            const obj: any = {}
+            if (row.columns && Array.isArray(row.columns)) {
+              row.columns.forEach((col: any) => {
+                if (col.columnInfo && col.columnInfo.columnName) {
+                  obj[col.columnInfo.columnName] = col.value
+                }
+              })
+            }
+            return obj as T
+          })
+        }
+      }
+
       return {
-        ...response,
+        data: flattenedData,
         success: true,
       }
     } catch (error: any) {

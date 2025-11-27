@@ -15,6 +15,35 @@ DataService is BIZUIT Dashboard's query abstraction layer. It allows you to exec
 - Data updates → Use processes
 - Workflow steps → Use processes
 
+### Response Format
+
+The SDK automatically transforms the complex Dashboard API response into a simple, developer-friendly array of objects:
+
+**Dashboard API returns (complex)**:
+```json
+{
+  "gridData": [{
+    "tableIndex": 0,
+    "rows": [{
+      "columns": [
+        { "columnInfo": { "columnName": "ParameterId" }, "value": 49 },
+        { "columnInfo": { "columnName": "ParameterName" }, "value": "Cancelada" }
+      ]
+    }]
+  }]
+}
+```
+
+**SDK returns (flattened)**:
+```json
+[
+  { "ParameterId": 49, "ParameterName": "Cancelada" },
+  { "ParameterId": 48, "ParameterName": "Inexistente" }
+]
+```
+
+✅ No need to parse nested structures - just use `result.data` directly!
+
 ---
 
 ## Installation

@@ -371,10 +371,30 @@
             throw new Error(`HTTP ${response.status}: ${response.statusText}`)
           }
 
-          const data = await response.json()
+          const responseData = await response.json()
+
+          // Transform gridData structure to flat array of objects
+          let flattenedData = []
+
+          if (responseData.gridData && Array.isArray(responseData.gridData) && responseData.gridData.length > 0) {
+            const gridTable = responseData.gridData[0]
+            if (gridTable.rows && Array.isArray(gridTable.rows)) {
+              flattenedData = gridTable.rows.map(row => {
+                const obj = {}
+                if (row.columns && Array.isArray(row.columns)) {
+                  row.columns.forEach(col => {
+                    if (col.columnInfo && col.columnInfo.columnName) {
+                      obj[col.columnInfo.columnName] = col.value
+                    }
+                  })
+                }
+                return obj
+              })
+            }
+          }
 
           return {
-            ...data,
+            data: flattenedData,
             success: true,
           }
         } catch (error) {

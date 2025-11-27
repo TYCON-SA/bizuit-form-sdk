@@ -1954,8 +1954,25 @@ var BizuitDataServiceService = class {
           }
         }
       );
+      let flattenedData = [];
+      if (response.gridData && Array.isArray(response.gridData) && response.gridData.length > 0) {
+        const gridTable = response.gridData[0];
+        if (gridTable.rows && Array.isArray(gridTable.rows)) {
+          flattenedData = gridTable.rows.map((row) => {
+            const obj = {};
+            if (row.columns && Array.isArray(row.columns)) {
+              row.columns.forEach((col) => {
+                if (col.columnInfo && col.columnInfo.columnName) {
+                  obj[col.columnInfo.columnName] = col.value;
+                }
+              });
+            }
+            return obj;
+          });
+        }
+      }
       return {
-        ...response,
+        data: flattenedData,
         success: true
       };
     } catch (error) {
