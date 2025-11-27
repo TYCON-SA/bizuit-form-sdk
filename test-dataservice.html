@@ -219,6 +219,12 @@
         <input type="text" id="dataServiceName" value="GetParametersByType" placeholder="ej: GetParametersByType, GetCustomers">
       </div>
 
+      <div class="form-group">
+        <label for="parameters">Parámetros (JSON)</label>
+        <textarea id="parameters" rows="4" placeholder='[{"name": "typename", "value": "Motivos de Rechazo"}]' style="font-family: monospace; width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 6px;">[{"name": "typename", "value": "Motivos de Rechazo"}]</textarea>
+        <small style="color: #666;">Formato: array de objetos con "name" y "value"</small>
+      </div>
+
       <button id="btnExecute" onclick="executeDataService()">
         Ejecutar DataService
       </button>
@@ -576,6 +582,7 @@
         const token = getToken()
         const pageName = document.getElementById('pageName').value
         const dataServiceName = document.getElementById('dataServiceName').value
+        const parametersText = document.getElementById('parameters').value
 
         if (!pageName) {
           throw new Error('Nombre de página es requerido')
@@ -585,12 +592,25 @@
           throw new Error('Nombre de DataService es requerido')
         }
 
+        // Parse parameters from JSON
+        let parameters = []
+        if (parametersText.trim()) {
+          try {
+            parameters = JSON.parse(parametersText)
+            if (!Array.isArray(parameters)) {
+              throw new Error('Los parámetros deben ser un array')
+            }
+          } catch (e) {
+            throw new Error(`Error parseando parámetros JSON: ${e.message}`)
+          }
+        }
+
         const startTime = performance.now()
 
         const result = await sdk.dataService.executeByPageAndName({
           pageName,
           dataServiceName,
-          parameters: [],
+          parameters,
           withoutCache: false,
           executeFromGlobal: false,
         }, token)
