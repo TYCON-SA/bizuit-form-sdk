@@ -110,6 +110,48 @@ async function loadFormCombos() {
 
 ---
 
+### 4. Execute by Name (Recommended - No Magic Numbers!)
+
+Instead of using numeric IDs, use descriptive names:
+
+```typescript
+async function loadRejectionTypes() {
+  // ✅ Descriptive, self-documenting, environment-portable
+  const result = await sdk.dataService.executeByName({
+    tabModuleId: 1018,                     // Page ID (stable)
+    dataServiceName: 'Motivos de Rechazo', // Human-readable name
+    parameters: [
+      { name: 'status', value: 'active' }
+    ]
+  }, token)
+
+  if (result.success) {
+    return result.data
+  } else {
+    console.error('Error:', result.errorMessage)
+    return []
+  }
+}
+
+// Compare with ID-based approach:
+// ❌ Hard to understand, brittle across environments
+const oldWay = await sdk.dataService.execute({ id: 42 }, token)
+
+// ✅ Clear, descriptive, portable
+const newWay = await sdk.dataService.executeByName({
+  tabModuleId: 1018,
+  dataServiceName: 'Motivos de Rechazo'
+}, token)
+```
+
+**Benefits:**
+- ✅ **Self-documenting**: Code reads like English
+- ✅ **Environment-portable**: Names are stable, IDs may vary
+- ✅ **No magic numbers**: '42' becomes 'Motivos de Rechazo'
+- ✅ **Discoverable**: See `getByTabModuleId()` to list all available DataServices
+
+---
+
 ## TypeScript Support
 
 Define your data types for full type safety:
@@ -329,6 +371,88 @@ const params = sdk.dataService.createParameters([
 //   { name: 'includeDetails', value: true, isGroupBy: false }
 // ]
 ```
+
+---
+
+### `sdk.dataService.executeByName<T>(request, token)` ⭐ Recommended
+
+Execute DataService by name instead of ID. Best for developer experience!
+
+```typescript
+const result = await sdk.dataService.executeByName<RejectionType>({
+  tabModuleId: 1018,                     // Page ID (required)
+  dataServiceName: 'Motivos de Rechazo', // DataService name (required)
+  parameters: [],                        // Query parameters (optional)
+  withoutCache: false,                   // Skip cache? (optional)
+  executeFromGlobal: false               // Execute from global scope? (optional)
+}, token)
+
+// Returns: IDataServiceResponse<T>
+// Same structure as execute(), but automatically resolves ID
+```
+
+**When to use:**
+- ✅ Always, unless you have a specific reason to use numeric ID
+- ✅ Cross-environment deployments (dev/qa/prod)
+- ✅ Self-documenting code
+- ✅ New forms and features
+
+---
+
+### `sdk.dataService.getByTabModuleId(tabModuleId, token)`
+
+Get all available DataServices for a page.
+
+```typescript
+const dataServices = await sdk.dataService.getByTabModuleId(1018, token)
+
+// Returns: IDataServiceMetadata[]
+// [
+//   { id: 1, name: 'Motivos de Rechazo', tabModuleId: 1018, isActive: true },
+//   { id: 2, name: 'Estados', tabModuleId: 1018, isActive: true },
+//   ...
+// ]
+
+// Then execute by ID if needed
+const ds = dataServices.find(ds => ds.name === 'Estados')
+if (ds) {
+  const result = await sdk.dataService.execute({ id: ds.id }, token)
+}
+```
+
+**Use cases:**
+- Discovery: List all available DataServices for a page
+- Manual lookup: Find ID by name
+- Metadata inspection: Get descriptions, active status, etc.
+
+---
+
+### `sdk.dataService.findByName(tabModuleId, name, token)`
+
+Find DataService metadata by name (without executing).
+
+```typescript
+const dataService = await sdk.dataService.findByName(
+  1018,
+  'Motivos de Rechazo',
+  token
+)
+
+if (dataService) {
+  console.log(`DataService ID: ${dataService.id}`)
+  console.log(`Description: ${dataService.description}`)
+
+  // Can now execute multiple times without re-fetching metadata
+  const result = await sdk.dataService.execute({ id: dataService.id }, token)
+}
+
+// Returns: IDataServiceMetadata | null
+```
+
+**Use cases:**
+- Check if DataService exists before executing
+- Cache metadata for multiple executions
+- Get DataService info without executing query
 
 ---
 
