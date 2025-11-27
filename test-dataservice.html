@@ -183,6 +183,59 @@
       font-size: 0.9rem;
       margin-top: 0.5rem;
     }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      background: white;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    th {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0.75rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 0.75rem;
+      border-bottom: 1px solid #e0e0e0;
+      color: #333;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover {
+      background-color: #f8f9ff;
+    }
+
+    .json-view {
+      margin-top: 1rem;
+    }
+
+    .json-toggle {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .json-toggle:hover {
+      background: #eee;
+    }
   </style>
 </head>
 <body>
@@ -545,11 +598,53 @@
         metricsDiv.innerHTML = ''
       }
 
-      // Show data
-      resultsDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`
+      // Show data as table if it's an array of objects
+      if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {
+        const columns = Object.keys(data[0])
+
+        const tableHTML = `
+          <table>
+            <thead>
+              <tr>
+                ${columns.map(col => `<th>${col}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map(row => `
+                <tr>
+                  ${columns.map(col => `<td>${row[col] ?? ''}</td>`).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <button class="json-toggle" onclick="toggleJSON()">
+            Ver JSON
+          </button>
+          <div id="jsonView" class="json-view" style="display: none;">
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          </div>
+        `
+        resultsDiv.innerHTML = tableHTML
+      } else {
+        // Show JSON for non-array data
+        resultsDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`
+      }
 
       // Scroll to results
       resultsCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+
+    function toggleJSON() {
+      const jsonView = document.getElementById('jsonView')
+      const button = event.target
+
+      if (jsonView.style.display === 'none') {
+        jsonView.style.display = 'block'
+        button.textContent = 'Ocultar JSON'
+      } else {
+        jsonView.style.display = 'none'
+        button.textContent = 'Ver JSON'
+      }
     }
 
     function showError(message) {
