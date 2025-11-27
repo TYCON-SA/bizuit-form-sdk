@@ -211,12 +211,12 @@
       <h2>Ejecutar DataService</h2>
       <div class="form-group">
         <label for="pageName">Nombre de Página</label>
-        <input type="text" id="pageName" value="Facturas" placeholder="ej: Facturas, Clientes, Productos">
+        <input type="text" id="pageName" value="DataService" placeholder="ej: DataService, Facturas, Clientes">
       </div>
 
       <div class="form-group">
         <label for="dataServiceName">Nombre del DataService</label>
-        <input type="text" id="dataServiceName" value="Motivos de Rechazo" placeholder="ej: Motivos de Rechazo">
+        <input type="text" id="dataServiceName" value="GetParametersByType" placeholder="ej: GetParametersByType, GetCustomers">
       </div>
 
       <button id="btnExecute" onclick="executeDataService()">
@@ -308,7 +308,23 @@
             throw new Error(`HTTP ${response.status}: ${response.statusText}`)
           }
 
-          return await response.json()
+          const data = await response.json()
+
+          // API returns: { id, tabModuleID, configuration: { grid: [...] } }
+          // Extract grid items and convert to DataService list
+          if (data && data.configuration && Array.isArray(data.configuration.grid)) {
+            return data.configuration.grid.map(item => ({
+              id: item.id,
+              name: item.title, // 'title' is the DataService name
+              tabModuleId: data.tabModuleID,
+              uniqueId: item.uniqueId,
+              cacheTime: item.cacheTime,
+              isGlobalParams: item.isGlobalParams,
+              isActive: true,
+            }))
+          }
+
+          return []
         } catch (error) {
           console.error('Error fetching DataServices:', error)
           return []

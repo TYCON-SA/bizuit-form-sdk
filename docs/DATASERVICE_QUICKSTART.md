@@ -157,13 +157,13 @@ const newWay = await sdk.dataService.executeByName({
 **NEW in v2.2.0** - Zero numeric IDs needed!
 
 ```typescript
-async function loadRejectionTypes() {
+async function loadParameters() {
   // 🎯 ULTIMATE DX - Only descriptive names, no IDs at all!
   const result = await sdk.dataService.executeByPageAndName({
-    pageName: 'Data Service',              // Page name (human-readable)
-    dataServiceName: 'Motivos de Rechazo', // DataService name (human-readable)
+    pageName: 'DataService',              // Page name (human-readable)
+    dataServiceName: 'GetParametersByType', // DataService name from grid.title
     parameters: [
-      { name: 'status', value: 'active' }
+      { name: 'typename', value: 'Motivos de Rechazo' }
     ]
   }, token)
 
@@ -172,6 +172,8 @@ async function loadRejectionTypes() {
   } else if (result.errorType === 'PAGE_NOT_FOUND') {
     // Security: User doesn't have access to this page
     console.error('Access denied or page not found')
+  } else if (result.errorType === 'NO_MODULES_FOUND') {
+    console.error('Page has no DataServices configured')
   } else if (result.errorType === 'DS_NOT_FOUND') {
     console.error('DataService not found in page')
   }
@@ -204,8 +206,8 @@ await sdk.dataService.executeByName({
 
 // v2.2.0 - Everything by name! 🎉
 await sdk.dataService.executeByPageAndName({
-  pageName: 'Data Service',  // ✅ Human-readable
-  dataServiceName: 'Motivos de Rechazo'  // ✅ Human-readable
+  pageName: 'DataService',  // ✅ Human-readable
+  dataServiceName: 'GetParametersByType'  // ✅ Human-readable (from grid.title)
 }, token)
 ```
 

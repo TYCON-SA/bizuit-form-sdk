@@ -2028,7 +2028,20 @@ var BizuitDataServiceService = class {
           }
         }
       );
-      return response || [];
+      if (response && response.configuration && Array.isArray(response.configuration.grid)) {
+        return response.configuration.grid.map((item) => ({
+          id: item.id,
+          name: item.title,
+          // 'title' is the DataService name
+          tabModuleId: response.tabModuleID,
+          uniqueId: item.uniqueId,
+          cacheTime: item.cacheTime,
+          isGlobalParams: item.isGlobalParams,
+          isActive: true
+          // Assume active if in grid
+        }));
+      }
+      return [];
     } catch (error) {
       console.error("Error fetching DataServices by tabModuleId:", error);
       return [];

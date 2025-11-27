@@ -145,7 +145,7 @@ export class BizuitDataServiceService {
     token: string
   ): Promise<IDataServiceMetadata[]> {
     try {
-      const response = await this.client.get<IDataServiceMetadata[]>(
+      const response = await this.client.get<any>(
         `${this.apiUrl}/Dashboard/DataService/GetByTabModuleId?tabModuleId=${tabModuleId}`,
         {
           headers: {
@@ -154,7 +154,21 @@ export class BizuitDataServiceService {
         }
       )
 
-      return response || []
+      // API returns: { id, tabModuleID, configuration: { grid: [...] } }
+      // Extract grid items and convert to IDataServiceMetadata
+      if (response && response.configuration && Array.isArray(response.configuration.grid)) {
+        return response.configuration.grid.map((item: any) => ({
+          id: item.id,
+          name: item.title, // 'title' is the DataService name
+          tabModuleId: response.tabModuleID,
+          uniqueId: item.uniqueId,
+          cacheTime: item.cacheTime,
+          isGlobalParams: item.isGlobalParams,
+          isActive: true, // Assume active if in grid
+        }))
+      }
+
+      return []
     } catch (error: any) {
       console.error('Error fetching DataServices by tabModuleId:', error)
       return []
