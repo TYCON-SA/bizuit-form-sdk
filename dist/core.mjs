@@ -2033,6 +2033,106 @@ var BizuitDataServiceService = class {
     const dataServices = await this.getByTabModuleId(tabModuleId, token);
     return dataServices.find((ds) => ds.name === dataServiceName) || null;
   }
+  /**
+   * Get all pages from Dashboard
+   *
+   * @example
+   * ```typescript
+   * const pages = await sdk.dataService.getPages(token)
+   * console.log(pages.map(p => p.name)) // ['Facturas', 'Clientes', 'Productos', ...]
+   *
+   * // Find page by name
+   * const facturasPage = pages.find(p => p.name === 'Facturas')
+   * if (facturasPage) {
+   *   const dataServices = await sdk.dataService.getByTabModuleId(facturasPage.id, token)
+   * }
+   * ```
+   */
+  async getPages(token) {
+    try {
+      const response = await this.client.get(
+        `${this.apiUrl}/Pages`,
+        {
+          headers: {
+            "bz-auth-token": `Basic ${token}`
+          }
+        }
+      );
+      return response || [];
+    } catch (error) {
+      console.error("Error fetching pages:", error);
+      return [];
+    }
+  }
+  /**
+   * Find a page by name
+   *
+   * @example
+   * ```typescript
+   * const page = await sdk.dataService.findPageByName('Facturas', token)
+   *
+   * if (page) {
+   *   console.log(`Page ID: ${page.id}`)
+   *   // Can now get DataServices for this page
+   *   const dataServices = await sdk.dataService.getByTabModuleId(page.id, token)
+   * }
+   * ```
+   */
+  async findPageByName(pageName, token) {
+    const pages = await this.getPages(token);
+    return pages.find((p) => p.name === pageName) || null;
+  }
+  /**
+   * Execute DataService by page name + DataService name
+   * BEST DEVELOPER EXPERIENCE - No numeric IDs needed at all!
+   *
+   * @example
+   * ```typescript
+   * // Developer only needs two descriptive names:
+   * // 1. Page name (e.g., 'Facturas')
+   * // 2. DataService name (e.g., 'Motivos de Rechazo')
+   *
+   * const result = await sdk.dataService.executeByPageAndName<RejectionType>({
+   *   pageName: 'Facturas',
+   *   dataServiceName: 'Motivos de Rechazo',
+   *   parameters: [
+   *     { name: 'status', value: 'active' }
+   *   ]
+   * }, token)
+   *
+   * if (result.success) {
+   *   console.log(result.data) // RejectionType[]
+   * }
+   * ```
+   */
+  async executeByPageAndName(request, token) {
+    const { pageName, dataServiceName, parameters = [], withoutCache = false, executeFromGlobal = false } = request;
+    try {
+      const page = await this.findPageByName(pageName, token);
+      if (!page) {
+        return {
+          data: [],
+          success: false,
+          errorMessage: `Page '${pageName}' not found`,
+          errorType: "PAGE_NOT_FOUND"
+        };
+      }
+      return await this.executeByName({
+        tabModuleId: page.id,
+        dataServiceName,
+        parameters,
+        withoutCache,
+        executeFromGlobal
+      }, token);
+    } catch (error) {
+      return {
+        data: [],
+        success: false,
+        errorMessage: error.message,
+        errorType: error.code
+      };
+    }
+  }
 };
 
 // src/lib/api/bizuit-sdk.ts

@@ -135,3 +135,66 @@ export interface IDataServiceExecuteByNameRequest {
    */
   executeFromGlobal?: boolean
 }
+
+/**
+ * Page metadata from Dashboard API
+ */
+export interface IPageMetadata {
+  /**
+   * Page ID (tabModuleId)
+   */
+  id: number
+
+  /**
+   * Page name (human-readable)
+   */
+  name: string
+
+  /**
+   * Page title
+   */
+  title?: string
+
+  /**
+   * Page URL/path
+   */
+  url?: string
+
+  /**
+   * Additional metadata fields from API
+   */
+  [key: string]: any
+}
+
+/**
+ * Request to execute DataService by page name + DataService name
+ * Most developer-friendly option - no numeric IDs needed!
+ */
+export interface IDataServiceExecuteByPageAndNameRequest {
+  /**
+   * Page name (e.g., 'Facturas', 'Clientes', 'Productos')
+   */
+  pageName: string
+
+  /**
+   * DataService name to find and execute
+   */
+  dataServiceName: string
+
+  /**
+   * Query parameters
+   */
+  parameters?: IDataServiceParameter[]
+
+  /**
+   * Force fresh query (skip cache)
+   * @default false
+   */
+  withoutCache?: boolean
+
+  /**
+   * Execute from global scope
+   * @default false
+   */
+  executeFromGlobal?: boolean
+}
