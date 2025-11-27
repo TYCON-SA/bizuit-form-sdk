@@ -141,14 +141,24 @@ export interface IDataServiceExecuteByNameRequest {
  */
 export interface IPageMetadata {
   /**
-   * Page ID (tabModuleId)
+   * Page ID (from API: tabId)
    */
-  id: number
+  tabId: number
 
   /**
-   * Page name (human-readable)
+   * Page name (from API: tabName)
    */
-  name: string
+  tabName: string
+
+  /**
+   * Tab order
+   */
+  tabOrder?: number
+
+  /**
+   * Is visible
+   */
+  isVisible?: boolean
 
   /**
    * Page title
@@ -158,7 +168,22 @@ export interface IPageMetadata {
   /**
    * Page URL/path
    */
-  url?: string
+  url?: string | null
+
+  /**
+   * Parent ID
+   */
+  parentId?: number | null
+
+  /**
+   * Icon file
+   */
+  iconFile?: string
+
+  /**
+   * Is disabled
+   */
+  disable?: boolean
 
   /**
    * Additional metadata fields from API

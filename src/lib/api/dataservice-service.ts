@@ -254,12 +254,12 @@ export class BizuitDataServiceService {
    * @example
    * ```typescript
    * const pages = await sdk.dataService.getPages(token)
-   * console.log(pages.map(p => p.name)) // ['Facturas', 'Clientes', 'Productos', ...]
+   * console.log(pages.map(p => p.tabName)) // ['Facturas', 'Clientes', 'Productos', ...]
    *
    * // Find page by name
-   * const facturasPage = pages.find(p => p.name === 'Facturas')
+   * const facturasPage = pages.find(p => p.tabName === 'Facturas')
    * if (facturasPage) {
-   *   const dataServices = await sdk.dataService.getByTabModuleId(facturasPage.id, token)
+   *   const dataServices = await sdk.dataService.getByTabModuleId(facturasPage.tabId, token)
    * }
    * ```
    */
@@ -289,9 +289,9 @@ export class BizuitDataServiceService {
    * const page = await sdk.dataService.findPageByName('Facturas', token)
    *
    * if (page) {
-   *   console.log(`Page ID: ${page.id}`)
+   *   console.log(`Page ID: ${page.tabId}`)
    *   // Can now get DataServices for this page
-   *   const dataServices = await sdk.dataService.getByTabModuleId(page.id, token)
+   *   const dataServices = await sdk.dataService.getByTabModuleId(page.tabId, token)
    * }
    * ```
    */
@@ -300,7 +300,7 @@ export class BizuitDataServiceService {
     token: string
   ): Promise<IPageMetadata | null> {
     const pages = await this.getPages(token)
-    return pages.find(p => p.name === pageName) || null
+    return pages.find(p => p.tabName === pageName) || null
   }
 
   /**
@@ -353,7 +353,7 @@ export class BizuitDataServiceService {
 
       // 2. Execute DataService by name using the page ID
       return await this.executeByName<T>({
-        tabModuleId: page.id,
+        tabModuleId: page.tabId,
         dataServiceName,
         parameters,
         withoutCache,

@@ -110,7 +110,7 @@ async function loadFormCombos() {
 
 ---
 
-### 4. Execute by Name (Recommended - No Magic Numbers!)
+### 4. Execute by Name (No Magic Numbers!)
 
 Instead of using numeric IDs, use descriptive names:
 
@@ -118,7 +118,7 @@ Instead of using numeric IDs, use descriptive names:
 async function loadRejectionTypes() {
   // ✅ Descriptive, self-documenting, environment-portable
   const result = await sdk.dataService.executeByName({
-    tabModuleId: 1018,                     // Page ID (stable)
+    tabModuleId: 1018,                     // Page ID (still numeric)
     dataServiceName: 'Motivos de Rechazo', // Human-readable name
     parameters: [
       { name: 'status', value: 'active' }
@@ -149,6 +149,65 @@ const newWay = await sdk.dataService.executeByName({
 - ✅ **Environment-portable**: Names are stable, IDs may vary
 - ✅ **No magic numbers**: '42' becomes 'Motivos de Rechazo'
 - ✅ **Discoverable**: See `getByTabModuleId()` to list all available DataServices
+
+---
+
+### 5. Execute by Page Name + DataService Name (⭐ BEST Developer Experience!)
+
+**NEW in v2.2.0** - Zero numeric IDs needed!
+
+```typescript
+async function loadRejectionTypes() {
+  // 🎯 ULTIMATE DX - Only descriptive names, no IDs at all!
+  const result = await sdk.dataService.executeByPageAndName({
+    pageName: 'Data Service',              // Page name (human-readable)
+    dataServiceName: 'Motivos de Rechazo', // DataService name (human-readable)
+    parameters: [
+      { name: 'status', value: 'active' }
+    ]
+  }, token)
+
+  if (result.success) {
+    return result.data
+  } else if (result.errorType === 'PAGE_NOT_FOUND') {
+    // Security: User doesn't have access to this page
+    console.error('Access denied or page not found')
+  } else if (result.errorType === 'DS_NOT_FOUND') {
+    console.error('DataService not found in page')
+  }
+}
+```
+
+**Benefits:**
+- ✅ **ZERO numeric IDs**: Everything is human-readable
+- ✅ **Automatic security**: Only accessible pages are returned
+- ✅ **Self-documenting**: `'Data Service' + 'Motivos de Rechazo'`
+- ✅ **Copy-paste friendly**: Same names work across environments
+
+**Security Feature:**
+The `/Pages` API only returns pages the authenticated user has access to. If `executeByPageAndName()` returns `PAGE_NOT_FOUND`, it means either:
+- The page doesn't exist, OR
+- The user doesn't have permission to access it
+
+This provides an automatic security layer without extra permission checks!
+
+**API Evolution:**
+```typescript
+// v2.0.0 - Numeric IDs everywhere
+await sdk.dataService.execute({ id: 42 }, token)
+
+// v2.1.0 - DataService by name (still needs page ID)
+await sdk.dataService.executeByName({
+  tabModuleId: 1018,  // ❌ Still numeric
+  dataServiceName: 'Motivos de Rechazo'
+}, token)
+
+// v2.2.0 - Everything by name! 🎉
+await sdk.dataService.executeByPageAndName({
+  pageName: 'Data Service',  // ✅ Human-readable
+  dataServiceName: 'Motivos de Rechazo'  // ✅ Human-readable
+}, token)
+```
 
 ---
 
