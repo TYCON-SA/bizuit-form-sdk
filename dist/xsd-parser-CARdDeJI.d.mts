@@ -352,13 +352,21 @@ interface IDataServiceExecuteByNameRequest {
  */
 interface IPageMetadata {
     /**
-     * Page ID (tabModuleId)
+     * Page ID (from API: tabId)
      */
-    id: number;
+    tabId: number;
     /**
-     * Page name (human-readable)
+     * Page name (from API: tabName)
      */
-    name: string;
+    tabName: string;
+    /**
+     * Tab order
+     */
+    tabOrder?: number;
+    /**
+     * Is visible
+     */
+    isVisible?: boolean;
     /**
      * Page title
      */
@@ -366,7 +374,23 @@ interface IPageMetadata {
     /**
      * Page URL/path
      */
-    url?: string;
+    url?: string | null;
+    /**
+     * Parent ID
+     */
+    parentId?: number | null;
+    /**
+     * Icon file
+     */
+    iconFile?: string;
+    /**
+     * Is disabled
+     */
+    disable?: boolean;
+    /**
+     * Child pages (nested pages)
+     */
+    children?: IPageMetadata[];
     /**
      * Additional metadata fields from API
      */
@@ -1539,27 +1563,27 @@ declare class BizuitDataServiceService {
      * @example
      * ```typescript
      * const pages = await sdk.dataService.getPages(token)
-     * console.log(pages.map(p => p.name)) // ['Facturas', 'Clientes', 'Productos', ...]
+     * console.log(pages.map(p => p.tabName)) // ['Facturas', 'Clientes', 'Productos', ...]
      *
      * // Find page by name
-     * const facturasPage = pages.find(p => p.name === 'Facturas')
+     * const facturasPage = pages.find(p => p.tabName === 'Facturas')
      * if (facturasPage) {
-     *   const dataServices = await sdk.dataService.getByTabModuleId(facturasPage.id, token)
+     *   const dataServices = await sdk.dataService.getByTabModuleId(facturasPage.tabId, token)
      * }
      * ```
      */
     getPages(token: string): Promise<IPageMetadata[]>;
     /**
-     * Find a page by name
+     * Find a page by name (searches recursively in children)
      *
      * @example
      * ```typescript
      * const page = await sdk.dataService.findPageByName('Facturas', token)
      *
      * if (page) {
-     *   console.log(`Page ID: ${page.id}`)
+     *   console.log(`Page ID: ${page.tabId}`)
      *   // Can now get DataServices for this page
-     *   const dataServices = await sdk.dataService.getByTabModuleId(page.id, token)
+     *   const dataServices = await sdk.dataService.getByTabModuleId(page.tabId, token)
      * }
      * ```
      */
@@ -1567,6 +1591,10 @@ declare class BizuitDataServiceService {
     /**
      * Execute DataService by page name + DataService name
      * BEST DEVELOPER EXPERIENCE - No numeric IDs needed at all!
+     *
+     * SECURITY BENEFIT: getPages() only returns pages the user has access to,
+     * providing an automatic security layer. If the user doesn't have access
+     * to the page, this method returns PAGE_NOT_FOUND error.
      *
      * @example
      * ```typescript
@@ -1584,6 +1612,8 @@ declare class BizuitDataServiceService {
      *
      * if (result.success) {
      *   console.log(result.data) // RejectionType[]
+     * } else if (result.errorType === 'PAGE_NOT_FOUND') {
+     *   console.log('User does not have access to this page')
      * }
      * ```
      */

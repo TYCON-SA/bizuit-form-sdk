@@ -418,9 +418,36 @@
             }
           }
 
-          // 2. Execute DataService by name using the page ID
+          // 2. Extract tabModuleID from modules array
+          let tabModuleId = null
+
+          // Navigate: page.modules[].modules[].tabModuleID
+          if (page.modules && Array.isArray(page.modules)) {
+            for (const moduleRow of page.modules) {
+              if (moduleRow.modules && Array.isArray(moduleRow.modules)) {
+                for (const module of moduleRow.modules) {
+                  if (module.tabModuleID) {
+                    tabModuleId = module.tabModuleID
+                    break
+                  }
+                }
+                if (tabModuleId) break
+              }
+            }
+          }
+
+          if (!tabModuleId) {
+            return {
+              data: [],
+              success: false,
+              errorMessage: `No modules found for page '${pageName}'`,
+              errorType: 'NO_MODULES_FOUND',
+            }
+          }
+
+          // 3. Execute DataService by name using the module ID
           return await this.executeByName({
-            tabModuleId: page.tabId,
+            tabModuleId,
             dataServiceName,
             parameters,
             withoutCache,
@@ -564,6 +591,8 @@
         } else {
           if (result.errorType === 'PAGE_NOT_FOUND') {
             showError(`La página '${pageName}' no existe o el usuario no tiene acceso a ella. Esto es parte de la seguridad automática del sistema.`)
+          } else if (result.errorType === 'NO_MODULES_FOUND') {
+            showError(`La página '${pageName}' no tiene módulos configurados. Verifica que la página tenga módulos asignados en Dashboard.`)
           } else if (result.errorType === 'DS_NOT_FOUND') {
             showError(`El DataService '${dataServiceName}' no fue encontrado en la página '${pageName}'.`)
           } else {

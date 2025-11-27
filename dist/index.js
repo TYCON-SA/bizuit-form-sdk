@@ -2110,12 +2110,12 @@ var BizuitDataServiceService = class {
    * @example
    * ```typescript
    * const pages = await sdk.dataService.getPages(token)
-   * console.log(pages.map(p => p.name)) // ['Facturas', 'Clientes', 'Productos', ...]
+   * console.log(pages.map(p => p.tabName)) // ['Facturas', 'Clientes', 'Productos', ...]
    *
    * // Find page by name
-   * const facturasPage = pages.find(p => p.name === 'Facturas')
+   * const facturasPage = pages.find(p => p.tabName === 'Facturas')
    * if (facturasPage) {
-   *   const dataServices = await sdk.dataService.getByTabModuleId(facturasPage.id, token)
+   *   const dataServices = await sdk.dataService.getByTabModuleId(facturasPage.tabId, token)
    * }
    * ```
    */
@@ -2136,26 +2136,44 @@ var BizuitDataServiceService = class {
     }
   }
   /**
-   * Find a page by name
+   * Find a page by name (searches recursively in children)
    *
    * @example
    * ```typescript
    * const page = await sdk.dataService.findPageByName('Facturas', token)
    *
    * if (page) {
-   *   console.log(`Page ID: ${page.id}`)
+   *   console.log(`Page ID: ${page.tabId}`)
    *   // Can now get DataServices for this page
-   *   const dataServices = await sdk.dataService.getByTabModuleId(page.id, token)
+   *   const dataServices = await sdk.dataService.getByTabModuleId(page.tabId, token)
    * }
    * ```
    */
   async findPageByName(pageName, token) {
     const pages = await this.getPages(token);
-    return pages.find((p) => p.name === pageName) || null;
+    const searchInPages = (pageList) => {
+      for (const page of pageList) {
+        if (page.tabName === pageName) {
+          return page;
+        }
+        if (page.children && Array.isArray(page.children) && page.children.length > 0) {
+          const found = searchInPages(page.children);
+          if (found) {
+            return found;
+          }
+        }
+      }
+      return null;
+    };
+    return searchInPages(pages);
   }
   /**
    * Execute DataService by page name + DataService name
    * BEST DEVELOPER EXPERIENCE - No numeric IDs needed at all!
+   *
+   * SECURITY BENEFIT: getPages() only returns pages the user has access to,
+   * providing an automatic security layer. If the user doesn't have access
+   * to the page, this method returns PAGE_NOT_FOUND error.
    *
    * @example
    * ```typescript
@@ -2173,6 +2191,8 @@ var BizuitDataServiceService = class {
    *
    * if (result.success) {
    *   console.log(result.data) // RejectionType[]
+   * } else if (result.errorType === 'PAGE_NOT_FOUND') {
+   *   console.log('User does not have access to this page')
    * }
    * ```
    */
@@ -2188,8 +2208,30 @@ var BizuitDataServiceService = class {
           errorType: "PAGE_NOT_FOUND"
         };
       }
+      let tabModuleId = null;
+      if (page.modules && Array.isArray(page.modules)) {
+        for (const moduleRow of page.modules) {
+          if (moduleRow.modules && Array.isArray(moduleRow.modules)) {
+            for (const module2 of moduleRow.modules) {
+              if (module2.tabModuleID) {
+                tabModuleId = module2.tabModuleID;
+                break;
+              }
+            }
+            if (tabModuleId) break;
+          }
+        }
+      }
+      if (!tabModuleId) {
+        return {
+          data: [],
+          success: false,
+          errorMessage: `No modules found for page '${pageName}'`,
+          errorType: "NO_MODULES_FOUND"
+        };
+      }
       return await this.executeByName({
-        tabModuleId: page.id,
+        tabModuleId,
         dataServiceName,
         parameters,
         withoutCache,

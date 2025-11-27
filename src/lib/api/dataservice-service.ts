@@ -371,9 +371,36 @@ export class BizuitDataServiceService {
         }
       }
 
-      // 2. Execute DataService by name using the page ID
+      // 2. Extract tabModuleID from modules array
+      let tabModuleId: number | null = null
+
+      // Navigate: page.modules[].modules[].tabModuleID
+      if (page.modules && Array.isArray(page.modules)) {
+        for (const moduleRow of page.modules) {
+          if (moduleRow.modules && Array.isArray(moduleRow.modules)) {
+            for (const module of moduleRow.modules) {
+              if (module.tabModuleID) {
+                tabModuleId = module.tabModuleID
+                break
+              }
+            }
+            if (tabModuleId) break
+          }
+        }
+      }
+
+      if (!tabModuleId) {
+        return {
+          data: [],
+          success: false,
+          errorMessage: `No modules found for page '${pageName}'`,
+          errorType: 'NO_MODULES_FOUND',
+        }
+      }
+
+      // 3. Execute DataService by name using the module ID
       return await this.executeByName<T>({
-        tabModuleId: page.tabId,
+        tabModuleId,
         dataServiceName,
         parameters,
         withoutCache,
