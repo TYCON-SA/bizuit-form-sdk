@@ -307,6 +307,10 @@ export class BizuitDataServiceService {
    * Execute DataService by page name + DataService name
    * BEST DEVELOPER EXPERIENCE - No numeric IDs needed at all!
    *
+   * SECURITY BENEFIT: getPages() only returns pages the user has access to,
+   * providing an automatic security layer. If the user doesn't have access
+   * to the page, this method returns PAGE_NOT_FOUND error.
+   *
    * @example
    * ```typescript
    * // Developer only needs two descriptive names:
@@ -323,6 +327,8 @@ export class BizuitDataServiceService {
    *
    * if (result.success) {
    *   console.log(result.data) // RejectionType[]
+   * } else if (result.errorType === 'PAGE_NOT_FOUND') {
+   *   console.log('User does not have access to this page')
    * }
    * ```
    */
