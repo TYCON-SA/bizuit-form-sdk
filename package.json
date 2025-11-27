@@ -1,7 +1,7 @@
 {
   "name": "@tyconsa/bizuit-form-sdk",
-  "version": "2.1.1",
-  "description": "Core SDK for Bizuit BPM form integration - handles authentication, process management, and instance locking. Simplified single-URL configuration!",
+  "version": "2.2.0",
+  "description": "Core SDK for Bizuit BPM form integration - handles authentication, process management, instance locking, and DataService queries. Simplified single-URL configuration!",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
