@@ -31,6 +31,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var src_exports = {};
 __export(src_exports, {
   BizuitAuthService: () => BizuitAuthService,
+  BizuitDataServiceService: () => BizuitDataServiceService,
   BizuitError: () => BizuitError,
   BizuitFormService: () => BizuitFormService,
   BizuitHttpClient: () => BizuitHttpClient,
@@ -1910,6 +1911,100 @@ var BizuitFormService = class {
   }
 };
 
+// src/lib/api/dataservice-service.ts
+var BizuitDataServiceService = class {
+  constructor(config) {
+    this.client = new BizuitHttpClient(config);
+    this.apiUrl = config.apiUrl;
+  }
+  /**
+   * Execute a DataService query
+   *
+   * @example
+   * ```typescript
+   * // Get list of rejection types
+   * const result = await sdk.dataService.execute<RejectionType>({
+   *   id: 42,
+   *   parameters: [
+   *     { name: 'status', value: 'active' }
+   *   ]
+   * }, token)
+   *
+   * console.log(result.data) // Array of RejectionType[]
+   * ```
+   */
+  async execute(request, token) {
+    const { id, parameters = [], withoutCache = false, executeFromGlobal = false } = request;
+    const queryParams = new URLSearchParams({
+      withoutCache: String(withoutCache),
+      executeFromGlobal: String(executeFromGlobal)
+    });
+    const body = {
+      id,
+      parameters: parameters.map((p) => ({
+        name: p.name,
+        value: p.value,
+        isGroupBy: p.isGroupBy ?? false
+      }))
+    };
+    try {
+      const response = await this.client.post(
+        `${this.apiUrl}/Dashboard/DataService/Execute?${queryParams.toString()}`,
+        body,
+        {
+          headers: {
+            "bz-auth-token": `Basic ${token}`
+          }
+        }
+      );
+      return {
+        ...response,
+        success: true
+      };
+    } catch (error) {
+      return {
+        data: [],
+        success: false,
+        errorMessage: error.message,
+        errorType: error.code
+      };
+    }
+  }
+  /**
+   * Helper to create DataService parameters
+   *
+   * @example
+   * ```typescript
+   * const params = sdk.dataService.createParameters([
+   *   { name: 'customerId', value: 'ALFKI' },
+   *   { name: 'year', value: 2024 }
+   * ])
+   * ```
+   */
+  createParameters(params) {
+    return params.map((p) => ({
+      name: p.name,
+      value: p.value,
+      isGroupBy: p.isGroupBy ?? false
+    }));
+  }
+  /**
+   * Execute multiple DataService queries in parallel
+   *
+   * @example
+   * ```typescript
+   * const [rejectionTypes, statusList] = await sdk.dataService.executeMany([
+   *   { id: 42, parameters: [] },
+   *   { id: 43, parameters: [] }
+   * ], token)
+   * ```
+   */
+  async executeMany(requests, token) {
+    const promises = requests.map((request) => this.execute(request, token));
+    return Promise.all(promises);
+  }
+};
+
 // src/lib/api/bizuit-sdk.ts
 var BizuitSDK = class {
   constructor(config) {
@@ -1918,6 +2013,7 @@ var BizuitSDK = class {
     this.process = new BizuitProcessService(config);
     this.instanceLock = new BizuitInstanceLockService(config);
     this.forms = new BizuitFormService(this);
+    this.dataService = new BizuitDataServiceService(config);
   }
   /**
    * Get current configuration
@@ -1934,6 +2030,7 @@ var BizuitSDK = class {
     this.process = new BizuitProcessService(this.config);
     this.instanceLock = new BizuitInstanceLockService(this.config);
     this.forms = new BizuitFormService(this);
+    this.dataService = new BizuitDataServiceService(this.config);
   }
 };
 
@@ -2374,6 +2471,7 @@ var VERSION = "1.0.0";
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   BizuitAuthService,
+  BizuitDataServiceService,
   BizuitError,
   BizuitFormService,
   BizuitHttpClient,

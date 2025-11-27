@@ -232,6 +232,67 @@ type ContinueProcessStatus = 'idle' | 'loading' | 'ready' | 'submitting' | 'succ
 type InstanceLockStatus = 'checking' | 'locked' | 'unlocked' | 'error';
 
 /**
+ * DataService Types
+ * Types for BIZUIT Dashboard DataService API
+ */
+/**
+ * DataService parameter (input)
+ */
+interface IDataServiceParameter {
+    name: string;
+    value: any;
+    isGroupBy?: boolean;
+}
+/**
+ * Request to execute a DataService query
+ */
+interface IDataServiceRequest {
+    /**
+     * DataService ID from BIZUIT Dashboard
+     */
+    id: number;
+    /**
+     * Query parameters
+     */
+    parameters?: IDataServiceParameter[];
+    /**
+     * Force fresh query (skip cache)
+     * @default false
+     */
+    withoutCache?: boolean;
+    /**
+     * Execute from global scope
+     * @default false
+     */
+    executeFromGlobal?: boolean;
+}
+/**
+ * DataService response (generic)
+ */
+interface IDataServiceResponse<T = any> {
+    /**
+     * Query result rows
+     */
+    data: T[];
+    /**
+     * Total row count (if applicable)
+     */
+    totalCount?: number;
+    /**
+     * Success flag
+     */
+    success: boolean;
+    /**
+     * Error message (if failed)
+     */
+    errorMessage?: string;
+    /**
+     * Error type/code (if failed)
+     */
+    errorType?: string;
+}
+
+/**
  * Main types export
  */
 
@@ -1254,6 +1315,62 @@ declare class BizuitFormService {
 }
 
 /**
+ * Bizuit DataService Service
+ * Executes queries via BIZUIT Dashboard DataService API
+ */
+
+declare class BizuitDataServiceService {
+    private client;
+    private apiUrl;
+    constructor(config: IBizuitConfig);
+    /**
+     * Execute a DataService query
+     *
+     * @example
+     * ```typescript
+     * // Get list of rejection types
+     * const result = await sdk.dataService.execute<RejectionType>({
+     *   id: 42,
+     *   parameters: [
+     *     { name: 'status', value: 'active' }
+     *   ]
+     * }, token)
+     *
+     * console.log(result.data) // Array of RejectionType[]
+     * ```
+     */
+    execute<T = any>(request: IDataServiceRequest, token: string): Promise<IDataServiceResponse<T>>;
+    /**
+     * Helper to create DataService parameters
+     *
+     * @example
+     * ```typescript
+     * const params = sdk.dataService.createParameters([
+     *   { name: 'customerId', value: 'ALFKI' },
+     *   { name: 'year', value: 2024 }
+     * ])
+     * ```
+     */
+    createParameters(params: Array<{
+        name: string;
+        value: any;
+        isGroupBy?: boolean;
+    }>): IDataServiceParameter[];
+    /**
+     * Execute multiple DataService queries in parallel
+     *
+     * @example
+     * ```typescript
+     * const [rejectionTypes, statusList] = await sdk.dataService.executeMany([
+     *   { id: 42, parameters: [] },
+     *   { id: 43, parameters: [] }
+     * ], token)
+     * ```
+     */
+    executeMany<T = any>(requests: IDataServiceRequest[], token: string): Promise<IDataServiceResponse<T>[]>;
+}
+
+/**
  * Bizuit SDK - Main entry point
  * Provides unified access to all Bizuit services
  */
@@ -1263,6 +1380,7 @@ declare class BizuitSDK {
     process: BizuitProcessService;
     instanceLock: BizuitInstanceLockService;
     forms: BizuitFormService;
+    dataService: BizuitDataServiceService;
     private config;
     constructor(config: IBizuitConfig);
     /**
@@ -1556,4 +1674,4 @@ declare function jsonToXml(obj: any, options?: {
  */
 declare function parseXsdToTemplate(xsdString: string): any;
 
-export { createParameter as $, type AuthControlType as A, BizuitSDK as B, type ContinueProcessStatus as C, type InstanceLockStatus as D, BizuitHttpClient as E, BizuitAuthService as F, BizuitProcessService as G, BizuitInstanceLockService as H, type IBizuitConfig as I, BizuitFormService as J, ParameterParser as K, BizuitError as L, handleError as M, xmlToJson as N, jsonToXml as O, type ParameterType as P, parseXsdToTemplate as Q, type Result as R, type StartProcessStatus as S, type IBizuitProcessParameter as T, filterFormParameters as U, filterContinueParameters as V, isParameterRequired as W, getParameterDirectionLabel as X, getParameterTypeLabel as Y, formDataToParameters as Z, parametersToFormData as _, type IUserInfo as a, mergeParameters as a0, type ILockInfo as a1, type ILoadInstanceDataResult as a2, type ILoadInstanceDataOptions as a3, loadInstanceDataForContinue as a4, releaseInstanceLock as a5, processUrlToken as a6, type IParameterMapping as a7, buildParameters as a8, parseBizuitUrlParam as a9, createAuthFromUrlToken as aa, buildLoginRedirectUrl as ab, type ErrorContext as ac, formatBizuitError as ad, XmlParameter as ae, isXmlParameter as af, type IRequestCheckFormAuth as b, type IApiError as c, type IAuthCheckData as d, type IAuthCheckResponse as e, type ILoginSettings as f, type ILoginRequest as g, type ILoginResponse as h, type IBizuitAuthHeaders as i, type ParameterDirection as j, type ProcessStatus as k, type IParameter as l, type IProcessParameter as m, type IInitializeParams as n, type IProcessData as o, type IActivityResult as p, type IStartProcessParams as q, type IProcessResult as r, type IRaiseEventParams as s, type IRaiseEventResult as t, type IEventParameter as u, type IInstanceData as v, type ILockStatus as w, type ILockRequest as x, type IUnlockRequest as y, type ProcessFlowStatus as z };
+export { getParameterDirectionLabel as $, type AuthControlType as A, BizuitSDK as B, type ContinueProcessStatus as C, type InstanceLockStatus as D, type IDataServiceParameter as E, type IDataServiceRequest as F, type IDataServiceResponse as G, BizuitHttpClient as H, type IBizuitConfig as I, BizuitAuthService as J, BizuitProcessService as K, BizuitInstanceLockService as L, BizuitFormService as M, BizuitDataServiceService as N, ParameterParser as O, type ParameterType as P, BizuitError as Q, type Result as R, type StartProcessStatus as S, handleError as T, xmlToJson as U, jsonToXml as V, parseXsdToTemplate as W, type IBizuitProcessParameter as X, filterFormParameters as Y, filterContinueParameters as Z, isParameterRequired as _, type IUserInfo as a, getParameterTypeLabel as a0, formDataToParameters as a1, parametersToFormData as a2, createParameter as a3, mergeParameters as a4, type ILockInfo as a5, type ILoadInstanceDataResult as a6, type ILoadInstanceDataOptions as a7, loadInstanceDataForContinue as a8, releaseInstanceLock as a9, processUrlToken as aa, type IParameterMapping as ab, buildParameters as ac, parseBizuitUrlParam as ad, createAuthFromUrlToken as ae, buildLoginRedirectUrl as af, type ErrorContext as ag, formatBizuitError as ah, XmlParameter as ai, isXmlParameter as aj, type IRequestCheckFormAuth as b, type IApiError as c, type IAuthCheckData as d, type IAuthCheckResponse as e, type ILoginSettings as f, type ILoginRequest as g, type ILoginResponse as h, type IBizuitAuthHeaders as i, type ParameterDirection as j, type ProcessStatus as k, type IParameter as l, type IProcessParameter as m, type IInitializeParams as n, type IProcessData as o, type IActivityResult as p, type IStartProcessParams as q, type IProcessResult as r, type IRaiseEventParams as s, type IRaiseEventResult as t, type IEventParameter as u, type IInstanceData as v, type ILockStatus as w, type ILockRequest as x, type IUnlockRequest as y, type ProcessFlowStatus as z };

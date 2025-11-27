@@ -7,6 +7,7 @@ Core SDK for Bizuit BPM form integration. Provides authentication, process manag
 - ✅ **Authentication & Authorization** - Token validation, user info, permission checks
 - ✅ **Process Management** - Initialize, start and continue processes, handle parameters
 - ✅ **Instance Locking** - Pessimistic locking for concurrent access control
+- ✅ **DataService Queries** - Fetch lookup data, lists, and reports from BIZUIT Dashboard (v2.2.0+)
 - ✅ **TypeScript Support** - Full type safety with TypeScript definitions
 - ✅ **React Hooks** - Easy integration with React applications
 - ✅ **Server-Side Support** - Works in Next.js API routes, server components, and Node.js (v1.5.0+)
@@ -748,6 +749,7 @@ const sdk = new BizuitSDK({
 sdk.auth          // BizuitAuthService
 sdk.process       // BizuitProcessService
 sdk.instanceLock  // BizuitInstanceLockService
+sdk.dataService   // BizuitDataServiceService
 ```
 
 ### BizuitAuthService
@@ -845,6 +847,56 @@ await sdk.instanceLock.withLock(lockRequest, token, async (sessionToken) => {
   // Instance will be unlocked automatically even if error occurs
 })
 ```
+
+### BizuitDataServiceService
+
+Execute queries via BIZUIT Dashboard DataService API - perfect for lookup data, lists, and reports.
+
+```typescript
+// Execute single query
+const result = await sdk.dataService.execute<RejectionType>({
+  id: 1, // DataService ID from BIZUIT Dashboard
+  parameters: [
+    { name: 'typename', value: 'Motivos de Rechazo' }
+  ]
+}, token)
+
+if (result.success) {
+  console.log('Rejection types:', result.data)
+}
+
+// Execute multiple queries in parallel
+const [suppliers, statuses] = await sdk.dataService.executeMany([
+  { id: 101, parameters: [] }, // Suppliers
+  { id: 102, parameters: [] }  // Statuses
+], token)
+
+// Create parameters helper
+const params = sdk.dataService.createParameters([
+  { name: 'customerId', value: 'ALFKI' },
+  { name: 'year', value: 2024 }
+])
+
+// Force fresh query (skip cache)
+const liveData = await sdk.dataService.execute({
+  id: 100,
+  parameters: [],
+  withoutCache: true // Skip cache
+}, token)
+```
+
+**When to use DataService:**
+- ✅ Combo box data (rejection types, status lists)
+- ✅ Reference tables (countries, categories)
+- ✅ Read-only reports and dashboards
+- ✅ Autocomplete suggestions
+
+**When NOT to use DataService:**
+- ❌ Business logic execution (use `process.raiseEvent()`)
+- ❌ Data updates (use processes)
+- ❌ Workflow steps (use processes)
+
+See [Example 7: DataService Queries](./docs/examples/example7-dataservice-queries.md) for complete usage examples.
 
 ## Process Workflows
 
