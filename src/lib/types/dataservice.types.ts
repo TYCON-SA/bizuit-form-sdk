@@ -68,3 +68,70 @@ export interface IDataServiceResponse<T = any> {
    */
   errorType?: string
 }
+
+/**
+ * DataService metadata (from GetByTabModuleId)
+ */
+export interface IDataServiceMetadata {
+  /**
+   * DataService ID (used for execute)
+   */
+  id: number
+
+  /**
+   * DataService name (human-readable)
+   */
+  name: string
+
+  /**
+   * Description
+   */
+  description?: string
+
+  /**
+   * Tab module ID
+   */
+  tabModuleId: number
+
+  /**
+   * Is active
+   */
+  isActive?: boolean
+
+  /**
+   * Additional metadata fields from API
+   */
+  [key: string]: any
+}
+
+/**
+ * Request to execute DataService by name (instead of ID)
+ */
+export interface IDataServiceExecuteByNameRequest {
+  /**
+   * Tab module ID (page ID)
+   */
+  tabModuleId: number
+
+  /**
+   * DataService name to find and execute
+   */
+  dataServiceName: string
+
+  /**
+   * Query parameters
+   */
+  parameters?: IDataServiceParameter[]
+
+  /**
+   * Force fresh query (skip cache)
+   * @default false
+   */
+  withoutCache?: boolean
+
+  /**
+   * Execute from global scope
+   * @default false
+   */
+  executeFromGlobal?: boolean
+}

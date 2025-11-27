@@ -467,4 +467,214 @@ describe('BizuitDataServiceService', () => {
       expect(priorities.data[0].name).toBe('High')
     })
   })
+
+  describe('getByTabModuleId', () => {
+    it('should fetch all DataServices for a tab module', async () => {
+      const mockDataServices = [
+        { id: 1, name: 'Motivos de Rechazo', tabModuleId: 1018, isActive: true },
+        { id: 2, name: 'Estados', tabModuleId: 1018, isActive: true },
+        { id: 3, name: 'Prioridades', tabModuleId: 1018, isActive: true },
+      ]
+
+      // Mock GET request
+      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
+      mockHttpClient.get = mockGet
+
+      const result = await service.getByTabModuleId(1018, mockToken)
+
+      expect(result).toHaveLength(3)
+      expect(result[0].name).toBe('Motivos de Rechazo')
+      expect(result[1].name).toBe('Estados')
+      expect(result[2].name).toBe('Prioridades')
+
+      // Verify API call
+      expect(mockGet).toHaveBeenCalledWith(
+        expect.stringContaining('/Dashboard/DataService/GetByTabModuleId?tabModuleId=1018'),
+        expect.objectContaining({
+          headers: {
+            'Authorization': `Basic ${mockToken}`,
+          },
+        })
+      )
+    })
+
+    it('should return empty array on error', async () => {
+      const mockGet = vi.fn().mockRejectedValueOnce(new Error('Network error'))
+      mockHttpClient.get = mockGet
+
+      const result = await service.getByTabModuleId(1018, mockToken)
+
+      expect(result).toEqual([])
+    })
+
+    it('should handle empty response', async () => {
+      const mockGet = vi.fn().mockResolvedValueOnce([])
+      mockHttpClient.get = mockGet
+
+      const result = await service.getByTabModuleId(1018, mockToken)
+
+      expect(result).toEqual([])
+    })
+  })
+
+  describe('executeByName', () => {
+    it('should find and execute DataService by name', async () => {
+      const mockDataServices = [
+        { id: 1, name: 'Motivos de Rechazo', tabModuleId: 1018 },
+        { id: 2, name: 'Estados', tabModuleId: 1018 },
+      ]
+
+      const mockExecuteResponse = {
+        success: true,
+        data: [
+          { id: 1, code: 'R001', description: 'Invalid data' },
+        ],
+      }
+
+      // Mock getByTabModuleId
+      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
+      mockHttpClient.get = mockGet
+
+      // Mock execute
+      mockHttpClient.post.mockResolvedValueOnce(mockExecuteResponse)
+
+      const result = await service.executeByName({
+        tabModuleId: 1018,
+        dataServiceName: 'Motivos de Rechazo',
+        parameters: [{ name: 'status', value: 'active' }],
+      }, mockToken)
+
+      expect(result.success).toBe(true)
+      expect(result.data).toHaveLength(1)
+      expect(result.data[0].code).toBe('R001')
+
+      // Verify getByTabModuleId was called
+      expect(mockGet).toHaveBeenCalled()
+
+      // Verify execute was called with correct ID
+      expect(mockHttpClient.post).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          id: 1, // ID from 'Motivos de Rechazo'
+          parameters: [{ name: 'status', value: 'active', isGroupBy: false }],
+        }),
+        expect.any(Object)
+      )
+    })
+
+    it('should return error if DataService not found', async () => {
+      const mockDataServices = [
+        { id: 1, name: 'Estados', tabModuleId: 1018 },
+      ]
+
+      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
+      mockHttpClient.get = mockGet
+
+      const result = await service.executeByName({
+        tabModuleId: 1018,
+        dataServiceName: 'NonExistent',
+        parameters: [],
+      }, mockToken)
+
+      expect(result.success).toBe(false)
+      expect(result.errorMessage).toContain('not found')
+      expect(result.errorType).toBe('DS_NOT_FOUND')
+      expect(result.data).toEqual([])
+    })
+
+    it('should support cache control', async () => {
+      const mockDataServices = [
+        { id: 1, name: 'Test DS', tabModuleId: 1018 },
+      ]
+
+      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
+      mockHttpClient.get = mockGet
+
+      mockHttpClient.post.mockResolvedValueOnce({ success: true, data: [] })
+
+      await service.executeByName({
+        tabModuleId: 1018,
+        dataServiceName: 'Test DS',
+        withoutCache: true,
+      }, mockToken)
+
+      // Verify withoutCache was passed through
+      expect(mockHttpClient.post).toHaveBeenCalledWith(
+        expect.stringContaining('withoutCache=true'),
+        expect.any(Object),
+        expect.any(Object)
+      )
+    })
+  })
+
+  describe('findByName', () => {
+    it('should find DataService by name', async () => {
+      const mockDataServices = [
+        { id: 1, name: 'Motivos de Rechazo', tabModuleId: 1018 },
+        { id: 2, name: 'Estados', tabModuleId: 1018 },
+      ]
+
+      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
+      mockHttpClient.get = mockGet
+
+      const result = await service.findByName(1018, 'Estados', mockToken)
+
+      expect(result).not.toBeNull()
+      expect(result?.id).toBe(2)
+      expect(result?.name).toBe('Estados')
+    })
+
+    it('should return null if not found', async () => {
+      const mockDataServices = [
+        { id: 1, name: 'Estados', tabModuleId: 1018 },
+      ]
+
+      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
+      mockHttpClient.get = mockGet
+
+      const result = await service.findByName(1018, 'NonExistent', mockToken)
+
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('Developer Experience - executeByName', () => {
+    it('should simplify form development with name-based lookup', async () => {
+      // Developer doesn't need to know DataService ID
+      // Only needs: tabModuleId (page ID) + DataService name
+
+      const mockDataServices = [
+        { id: 42, name: 'Motivos de Rechazo', tabModuleId: 1018 },
+      ]
+
+      const mockRejectionTypes = {
+        success: true,
+        data: [
+          { id: 1, code: 'R001', description: 'Invalid data' },
+          { id: 2, code: 'R002', description: 'Missing fields' },
+        ],
+      }
+
+      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
+      mockHttpClient.get = mockGet
+      mockHttpClient.post.mockResolvedValueOnce(mockRejectionTypes)
+
+      // Simple, descriptive API
+      const result = await service.executeByName({
+        tabModuleId: 1018,
+        dataServiceName: 'Motivos de Rechazo',
+      }, mockToken)
+
+      expect(result.success).toBe(true)
+      expect(result.data).toHaveLength(2)
+
+      // Can be used directly for combo box
+      const comboOptions = result.data.map(item => ({
+        value: item.id,
+        label: `${item.code} - ${item.description}`,
+      }))
+
+      expect(comboOptions[0]).toEqual({ value: 1, label: 'R001 - Invalid data' })
+    })
+  })
 })

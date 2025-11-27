@@ -291,6 +291,62 @@ interface IDataServiceResponse<T = any> {
      */
     errorType?: string;
 }
+/**
+ * DataService metadata (from GetByTabModuleId)
+ */
+interface IDataServiceMetadata {
+    /**
+     * DataService ID (used for execute)
+     */
+    id: number;
+    /**
+     * DataService name (human-readable)
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description?: string;
+    /**
+     * Tab module ID
+     */
+    tabModuleId: number;
+    /**
+     * Is active
+     */
+    isActive?: boolean;
+    /**
+     * Additional metadata fields from API
+     */
+    [key: string]: any;
+}
+/**
+ * Request to execute DataService by name (instead of ID)
+ */
+interface IDataServiceExecuteByNameRequest {
+    /**
+     * Tab module ID (page ID)
+     */
+    tabModuleId: number;
+    /**
+     * DataService name to find and execute
+     */
+    dataServiceName: string;
+    /**
+     * Query parameters
+     */
+    parameters?: IDataServiceParameter[];
+    /**
+     * Force fresh query (skip cache)
+     * @default false
+     */
+    withoutCache?: boolean;
+    /**
+     * Execute from global scope
+     * @default false
+     */
+    executeFromGlobal?: boolean;
+}
 
 /**
  * Main types export
@@ -1368,6 +1424,62 @@ declare class BizuitDataServiceService {
      * ```
      */
     executeMany<T = any>(requests: IDataServiceRequest[], token: string): Promise<IDataServiceResponse<T>[]>;
+    /**
+     * Get all DataServices for a specific tab module (page)
+     *
+     * @example
+     * ```typescript
+     * const dataServices = await sdk.dataService.getByTabModuleId(1018, token)
+     * console.log(dataServices) // Array of IDataServiceMetadata
+     *
+     * // Find by name
+     * const rejectionDS = dataServices.find(ds => ds.name === 'Motivos de Rechazo')
+     * if (rejectionDS) {
+     *   const result = await sdk.dataService.execute({ id: rejectionDS.id }, token)
+     * }
+     * ```
+     */
+    getByTabModuleId(tabModuleId: number, token: string): Promise<IDataServiceMetadata[]>;
+    /**
+     * Execute a DataService by name (instead of ID)
+     * Automatically finds the DataService ID from the tab module and executes it
+     *
+     * @example
+     * ```typescript
+     * // Developer only needs to know:
+     * // 1. Tab module ID (page ID) - stable across environments
+     * // 2. DataService name - descriptive, human-readable
+     *
+     * const result = await sdk.dataService.executeByName<RejectionType>({
+     *   tabModuleId: 1018,
+     *   dataServiceName: 'Motivos de Rechazo',
+     *   parameters: [
+     *     { name: 'status', value: 'active' }
+     *   ]
+     * }, token)
+     *
+     * if (result.success) {
+     *   console.log(result.data) // RejectionType[]
+     * }
+     * ```
+     */
+    executeByName<T = any>(request: IDataServiceExecuteByNameRequest, token: string): Promise<IDataServiceResponse<T>>;
+    /**
+     * Find a DataService by name in a tab module
+     * Returns the DataService metadata without executing it
+     *
+     * @example
+     * ```typescript
+     * const dataService = await sdk.dataService.findByName(1018, 'Motivos de Rechazo', token)
+     *
+     * if (dataService) {
+     *   console.log(`Found DataService ID: ${dataService.id}`)
+     *   // Can now execute it multiple times without re-fetching metadata
+     *   const result = await sdk.dataService.execute({ id: dataService.id }, token)
+     * }
+     * ```
+     */
+    findByName(tabModuleId: number, dataServiceName: string, token: string): Promise<IDataServiceMetadata | null>;
 }
 
 /**
@@ -1674,4 +1786,4 @@ declare function jsonToXml(obj: any, options?: {
  */
 declare function parseXsdToTemplate(xsdString: string): any;
 
-export { getParameterDirectionLabel as $, type AuthControlType as A, BizuitSDK as B, type ContinueProcessStatus as C, type InstanceLockStatus as D, type IDataServiceParameter as E, type IDataServiceRequest as F, type IDataServiceResponse as G, BizuitHttpClient as H, type IBizuitConfig as I, BizuitAuthService as J, BizuitProcessService as K, BizuitInstanceLockService as L, BizuitFormService as M, BizuitDataServiceService as N, ParameterParser as O, type ParameterType as P, BizuitError as Q, type Result as R, type StartProcessStatus as S, handleError as T, xmlToJson as U, jsonToXml as V, parseXsdToTemplate as W, type IBizuitProcessParameter as X, filterFormParameters as Y, filterContinueParameters as Z, isParameterRequired as _, type IUserInfo as a, getParameterTypeLabel as a0, formDataToParameters as a1, parametersToFormData as a2, createParameter as a3, mergeParameters as a4, type ILockInfo as a5, type ILoadInstanceDataResult as a6, type ILoadInstanceDataOptions as a7, loadInstanceDataForContinue as a8, releaseInstanceLock as a9, processUrlToken as aa, type IParameterMapping as ab, buildParameters as ac, parseBizuitUrlParam as ad, createAuthFromUrlToken as ae, buildLoginRedirectUrl as af, type ErrorContext as ag, formatBizuitError as ah, XmlParameter as ai, isXmlParameter as aj, type IRequestCheckFormAuth as b, type IApiError as c, type IAuthCheckData as d, type IAuthCheckResponse as e, type ILoginSettings as f, type ILoginRequest as g, type ILoginResponse as h, type IBizuitAuthHeaders as i, type ParameterDirection as j, type ProcessStatus as k, type IParameter as l, type IProcessParameter as m, type IInitializeParams as n, type IProcessData as o, type IActivityResult as p, type IStartProcessParams as q, type IProcessResult as r, type IRaiseEventParams as s, type IRaiseEventResult as t, type IEventParameter as u, type IInstanceData as v, type ILockStatus as w, type ILockRequest as x, type IUnlockRequest as y, type ProcessFlowStatus as z };
+export { filterContinueParameters as $, type AuthControlType as A, BizuitSDK as B, type ContinueProcessStatus as C, type InstanceLockStatus as D, type IDataServiceParameter as E, type IDataServiceRequest as F, type IDataServiceResponse as G, type IDataServiceMetadata as H, type IBizuitConfig as I, type IDataServiceExecuteByNameRequest as J, BizuitHttpClient as K, BizuitAuthService as L, BizuitProcessService as M, BizuitInstanceLockService as N, BizuitFormService as O, type ParameterType as P, BizuitDataServiceService as Q, type Result as R, type StartProcessStatus as S, ParameterParser as T, BizuitError as U, handleError as V, xmlToJson as W, jsonToXml as X, parseXsdToTemplate as Y, type IBizuitProcessParameter as Z, filterFormParameters as _, type IUserInfo as a, isParameterRequired as a0, getParameterDirectionLabel as a1, getParameterTypeLabel as a2, formDataToParameters as a3, parametersToFormData as a4, createParameter as a5, mergeParameters as a6, type ILockInfo as a7, type ILoadInstanceDataResult as a8, type ILoadInstanceDataOptions as a9, loadInstanceDataForContinue as aa, releaseInstanceLock as ab, processUrlToken as ac, type IParameterMapping as ad, buildParameters as ae, parseBizuitUrlParam as af, createAuthFromUrlToken as ag, buildLoginRedirectUrl as ah, type ErrorContext as ai, formatBizuitError as aj, XmlParameter as ak, isXmlParameter as al, type IRequestCheckFormAuth as b, type IApiError as c, type IAuthCheckData as d, type IAuthCheckResponse as e, type ILoginSettings as f, type ILoginRequest as g, type ILoginResponse as h, type IBizuitAuthHeaders as i, type ParameterDirection as j, type ProcessStatus as k, type IParameter as l, type IProcessParameter as m, type IInitializeParams as n, type IProcessData as o, type IActivityResult as p, type IStartProcessParams as q, type IProcessResult as r, type IRaiseEventParams as s, type IRaiseEventResult as t, type IEventParameter as u, type IInstanceData as v, type ILockStatus as w, type ILockRequest as x, type IUnlockRequest as y, type ProcessFlowStatus as z };
