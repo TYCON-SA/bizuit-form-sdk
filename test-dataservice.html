@@ -734,7 +734,7 @@
         const duration = Math.round(endTime - startTime)
 
         if (result.success) {
-          showResults(result, {
+          showResults(result.data, {
             'Registros': result.data?.length || 0,
             'Tiempo': `${duration}ms`,
             'Estado': 'Éxito'
