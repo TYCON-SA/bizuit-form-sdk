@@ -186,6 +186,11 @@ export interface IPageMetadata {
   disable?: boolean
 
   /**
+   * Child pages (nested pages)
+   */
+  children?: IPageMetadata[]
+
+  /**
    * Additional metadata fields from API
    */
   [key: string]: any

@@ -270,7 +270,27 @@
 
       async findPageByName(pageName, token) {
         const pages = await this.getPages(token)
-        return pages.find(p => p.tabName === pageName) || null
+
+        // Helper function to search recursively
+        const searchInPages = (pageList) => {
+          for (const page of pageList) {
+            // Check current page
+            if (page.tabName === pageName) {
+              return page
+            }
+
+            // Search in children if they exist
+            if (page.children && Array.isArray(page.children) && page.children.length > 0) {
+              const found = searchInPages(page.children)
+              if (found) {
+                return found
+              }
+            }
+          }
+          return null
+        }
+
+        return searchInPages(pages)
       }
 
       async getByTabModuleId(tabModuleId, token) {

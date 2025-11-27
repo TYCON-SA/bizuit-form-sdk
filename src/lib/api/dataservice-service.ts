@@ -282,7 +282,7 @@ export class BizuitDataServiceService {
   }
 
   /**
-   * Find a page by name
+   * Find a page by name (searches recursively in children)
    *
    * @example
    * ```typescript
@@ -300,7 +300,27 @@ export class BizuitDataServiceService {
     token: string
   ): Promise<IPageMetadata | null> {
     const pages = await this.getPages(token)
-    return pages.find(p => p.tabName === pageName) || null
+
+    // Helper function to search recursively
+    const searchInPages = (pageList: IPageMetadata[]): IPageMetadata | null => {
+      for (const page of pageList) {
+        // Check current page
+        if (page.tabName === pageName) {
+          return page
+        }
+
+        // Search in children if they exist
+        if (page.children && Array.isArray(page.children) && page.children.length > 0) {
+          const found = searchInPages(page.children)
+          if (found) {
+            return found
+          }
+        }
+      }
+      return null
+    }
+
+    return searchInPages(pages)
   }
 
   /**
