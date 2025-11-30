@@ -8,6 +8,7 @@ Core SDK for Bizuit BPM form integration. Provides authentication, process manag
 - ✅ **Process Management** - Initialize, start and continue processes, handle parameters
 - ✅ **Instance Locking** - Pessimistic locking for concurrent access control
 - ✅ **DataService Queries** - Fetch lookup data, lists, and reports from BIZUIT Dashboard (v2.2.0+)
+- ✅ **Task List Management** - Retrieve user tasks based on BPM permissions with flattened JSON (v2.3.0+)
 - ✅ **TypeScript Support** - Full type safety with TypeScript definitions
 - ✅ **React Hooks** - Easy integration with React applications
 - ✅ **Server-Side Support** - Works in Next.js API routes, server components, and Node.js (v1.5.0+)
@@ -897,6 +898,690 @@ const liveData = await sdk.dataService.execute({
 - ❌ Workflow steps (use processes)
 
 See [Example 7: DataService Queries](./docs/examples/example7-dataservice-queries.md) for complete usage examples.
+
+### BizuitTaskService ✨ NEW in v2.3.0
+
+Retrieve user task lists based on Bizuit BPM permissions. Perfect for building task management UIs, dashboards, and work queues.
+
+**Key Features:**
+- ✅ Automatic JSON flattening - Clean, flat objects for easy rendering
+- ✅ User-friendly property names - Access columns by display name (e.g., `task['CLIENTE']`)
+- ✅ Pagination support - Handle large task lists efficiently
+- ✅ Process metadata - Get all processes with activities and start points
+- ✅ Task filtering - Search by process, activity, date range, locked state
+
+```typescript
+// Get all processes available to user
+const processes = await sdk.tasks.getProcesses(token)
+
+processes.forEach(process => {
+  console.log('Process:', process.workflowDisplayName)
+  console.log('Start points:', process.activities.filter(a => a.isStartPoint))
+  console.log('Activities:', process.activities.filter(a => !a.isStartPoint))
+})
+
+// Search for task instances with pagination
+const result = await sdk.tasks.searchTasks({
+  ProcessName: 'TestWix',
+  ActivityName: 'userInteractionActivity1',
+  pageNumber: 1,
+  pageSize: 20,
+  DateFrom: '2025-01-01',
+  DateTo: '2025-12-31',
+  LockedState: -1  // -1 = all, 0 = unlocked, 1 = locked
+}, token)
+
+console.log('Total tasks:', result.instancesTotalCount[0]?.count)
+console.log('Instances:', result.instances.length)
+
+// Access instances with flattened JSON structure
+result.instances.forEach(instance => {
+  // Standard properties
+  console.log('Instance ID:', instance.instanceId)
+  console.log('Status:', instance.locked ? 'Locked' : 'Available')
+  console.log('Locked by:', instance.lockedBy)
+
+  // Dynamic columns with user-friendly names (automatically flattened)
+  console.log('Cliente:', instance['CLIENTE'])
+  console.log('Descripción:', instance['Descripción'])
+  console.log('Versión:', instance['Versión'])
+  console.log('Usuario:', instance['Último ejecutado por'])
+  console.log('Fecha:', instance['Fecha Ejecución'])
+  console.log('Tiempo:', instance['Tiempo Transcurrido'])
+})
+```
+
+**Before/After JSON Transformation:**
+
+```typescript
+// ❌ RAW API Response (complex structure)
+{
+  "instanceId": "abc-123",
+  "locked": false,
+  "lockedBy": "",
+  "eventName": "TestWix",           // Removed by SDK
+  "activityName": "activity1",      // Removed by SDK
+  "instanceDescription": "...",     // Removed by SDK
+  "columnDefinitionValues": [       // Removed by SDK (flattened)
+    { "columnName": "xCol_159307d8", "value": "ACME Corp" },
+    { "columnName": "xCol_234abcd", "value": "Producto X" }
+  ]
+}
+
+// ✅ SDK Returns (clean, flat structure)
+{
+  "instanceId": "abc-123",
+  "locked": false,
+  "lockedBy": "",
+  "CLIENTE": "ACME Corp",           // User-friendly property name!
+  "Descripción": "Producto X"       // Direct access via headerText
+}
+```
+
+**All TaskService Methods:**
+
+```typescript
+// Get all processes
+const processes = await sdk.tasks.getProcesses(token)
+
+// Get specific process details
+const processDetails = await sdk.tasks.getProcessDetails('TestWix', token)
+
+// Search tasks (with pagination)
+const tasks = await sdk.tasks.searchTasks({
+  ProcessName: 'TestWix',
+  ActivityName: 'userInteractionActivity1',
+  pageNumber: 1,
+  pageSize: 20
+}, token)
+
+// Get task count only
+const count = await sdk.tasks.getTaskCount('TestWix', 'activity1', token)
+
+// Get all start points across processes
+const startPoints = await sdk.tasks.getStartPoints(token)
+
+// Get all activities (non-start points)
+const activities = await sdk.tasks.getActivities(token)
+```
+
+**Building a Task List UI:**
+
+```typescript
+import { useBizuitSDK } from '@tyconsa/bizuit-form-sdk'
+import { useState, useEffect } from 'react'
+
+function TaskListDemo() {
+  const sdk = useBizuitSDK()
+  const [processes, setProcesses] = useState([])
+  const [tasks, setTasks] = useState([])
+  const [columnDefinitions, setColumnDefinitions] = useState([])
+
+  // Load processes on mount
+  useEffect(() => {
+    loadProcesses()
+  }, [])
+
+  const loadProcesses = async () => {
+    const data = await sdk.tasks.getProcesses(token)
+    setProcesses(data)
+  }
+
+  const loadTasks = async (processName, activityName) => {
+    const response = await sdk.tasks.searchTasks({
+      ProcessName: processName,
+      ActivityName: activityName,
+      pageNumber: 1,
+      pageSize: 20
+    }, token)
+
+    // Extract column definitions from events metadata
+    const eventActivity = response.events
+      .find(e => e.eventName === processName)
+      ?.activities.find(a => a.activityName === activityName)
+
+    setColumnDefinitions(eventActivity?.columnsDefinitions || [])
+    setTasks(response.instances)
+  }
+
+  return (
+    <div>
+      {/* Process selector */}
+      <select onChange={(e) => {
+        const process = processes.find(p => p.name === e.target.value)
+        // ... load activities for selected process
+      }}>
+        {processes.map(p => (
+          <option key={p.name} value={p.name}>
+            {p.workflowDisplayName}
+          </option>
+        ))}
+      </select>
+
+      {/* Task table with dynamic columns */}
+      <table>
+        <thead>
+          <tr>
+            <th>Estado</th>
+            <th>Instance ID</th>
+            {columnDefinitions.map(col => (
+              <th key={col.name}>{col.headerText}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map(task => (
+            <tr key={task.instanceId}>
+              <td>{task.locked ? '🔒 Bloqueado' : '✅ Disponible'}</td>
+              <td>{task.instanceId.substring(0, 8)}...</td>
+              {columnDefinitions.map(col => (
+                <td key={col.name}>
+                  {task[col.headerText] || '-'}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+```
+
+**When to use TaskService:**
+- ✅ User task lists and work queues
+- ✅ Task management dashboards
+- ✅ Process instance browsers
+- ✅ Pending tasks displays
+- ✅ Task assignment UIs
+
+**When NOT to use TaskService:**
+- ❌ Starting new processes (use `process.start()`)
+- ❌ Executing business logic (use `process.raiseEvent()`)
+- ❌ Managing instance locks (use `instanceLock` service)
+
+---
+
+#### TaskService API Structure
+
+**Process Metadata Structure:**
+
+```typescript
+interface IProcessMetadata {
+  name: string                      // Process internal name (e.g., "TestWix")
+  workflowDisplayName: string       // User-friendly name (e.g., "Test Workflow")
+  workflowName: string              // Workflow internal name
+  category: string                  // Process category
+  subCategory: string               // Process sub-category
+  icon: string | null               // Icon identifier
+  iconColor: string | null          // Icon color
+  activities: IActivityMetadata[]   // All activities in process
+}
+
+interface IActivityMetadata {
+  activityName: string              // Activity internal name
+  displayName: string               // User-friendly name
+  isStartPoint: boolean             // true if this is a process start point
+  hasQuickForm: boolean             // true if activity has quick form
+  formId: number                    // Form ID if WebForm connector
+  formName: string | null           // Form name if WebForm connector
+  connectorType: string | null      // Connector type (WebForm, WebPage, BIZUIT, etc.)
+  connectorUrl: string | null       // URL template with placeholders
+  instructions: string | null       // HTML instructions for activity
+  width: number                     // Connector width
+  height: number                    // Connector height
+  version: string | null            // Process version
+  childEventName: string | null     // Child event name if applicable
+  isGroupingActivity: boolean       // true if grouping activity
+  isEmpty: boolean                  // true if empty activity
+  idBindedConnector: string | null  // Binded connector ID
+  isDefault: boolean                // true if default connector
+}
+```
+
+**Task Instance Structure (After SDK Transformation):**
+
+```typescript
+interface ITaskInstance {
+  // Core properties
+  instanceId: string                // Unique instance identifier
+  locked: boolean                   // Whether instance is locked
+  lockedBy: string                  // User who locked the instance
+  executionDateTime: string         // Execution date/time display text
+  dateToCompare: string             // ISO date string for comparison
+  warningLevelId: string            // Warning level ID
+  backColor: string                 // Background color for UI
+  foreColor: string                 // Foreground color for UI
+  documentsQuantity: number         // Number of attached documents
+  version: string                   // Process version
+
+  // Dynamic columns (flattened from columnDefinitionValues)
+  // These are added dynamically based on process configuration
+  [key: string]: any                // e.g., task['CLIENTE'], task['Descripción']
+
+  // ❌ REMOVED by SDK (redundant):
+  // eventName: string
+  // activityName: string
+  // instanceDescription: string
+  // columnDefinitionValues: IColumnDefinitionValue[]
+}
+```
+
+**Column Definition Structure:**
+
+```typescript
+interface IColumnDefinition {
+  name: string                      // Technical column name (e.g., "xCol_159307d8")
+  headerText: string                // User-friendly name (e.g., "CLIENTE")
+  type: string                      // Column type
+  condition: string                 // Conditions XML
+  dateProperties: {
+    applyFormat: boolean
+    format: string
+    customFormat: string
+  }
+}
+```
+
+**Search Request Parameters:**
+
+```typescript
+interface ITasksSearchRequest {
+  // Required
+  ProcessName: string               // Process to search
+  ActivityName: string              // Activity to search
+
+  // Optional filters
+  DateFrom?: string                 // Format: 'YYYY-MM-DD'
+  DateTo?: string                   // Format: 'YYYY-MM-DD'
+  LockedState?: number              // -1 = all, 0 = unlocked, 1 = locked
+  ExpirationInterval?: string       // Expiration interval filter
+  ChildProcessName?: string         // Child process filter
+  SerializedFilters?: string        // Serialized filters
+  IncludeWarnings?: boolean         // Include warnings (default: true)
+  Parameters?: any[]                // Additional parameters
+
+  // Pagination (sent via headers)
+  pageNumber?: number               // 1-based page number (header: bz-page)
+  pageSize?: number                 // Page size (header: bz-page-size)
+
+  // Internal (not sent to API)
+  IsMobile?: boolean                // Mobile request flag
+}
+```
+
+**Search Response Structure:**
+
+```typescript
+interface ITasksSearchResponse {
+  events: ITaskEvent[]              // Events with metadata
+  instances: ITaskInstance[]        // Flattened task instances
+  moreThanLimit: boolean            // true if more results exist
+  instancesTotalCount: IInstanceCount[]  // Total count per event
+}
+
+interface ITaskEvent {
+  eventName: string                 // Event name
+  activities: IEventActivity[]      // Activities with metadata
+}
+
+interface IEventActivity {
+  activityName: string              // Activity name
+  columnsDefinitions: IColumnDefinition[]  // Column definitions
+  connectors: IConnectorMetadata[]  // Available connectors
+  connectorUrl: string              // Connector URL template
+  hasQuickForm: boolean             // Has quick form
+  hasMultipleQuickForm: boolean     // Has multiple quick forms
+  idBindedConnector: string         // Binded connector ID
+  isGroupingActivity: boolean       // Is grouping activity
+  // ... additional properties
+}
+
+interface IInstanceCount {
+  eventName: string                 // Event name
+  count: number                     // Total instance count
+  instancesList: any | null         // Instances list (null in summary)
+}
+```
+
+---
+
+#### Advanced TaskService Usage
+
+**Pattern 1: Multi-Process Task Dashboard**
+
+```typescript
+import { useBizuitSDK } from '@tyconsa/bizuit-form-sdk'
+
+function MultiProcessDashboard() {
+  const sdk = useBizuitSDK()
+  const [allTasks, setAllTasks] = useState([])
+
+  const loadAllUserTasks = async (token: string) => {
+    // Step 1: Get all processes
+    const processes = await sdk.tasks.getProcesses(token)
+
+    // Step 2: For each process, get all activities
+    const taskPromises = processes.flatMap(process =>
+      process.activities
+        .filter(a => !a.isStartPoint) // Only task activities
+        .map(activity =>
+          sdk.tasks.searchTasks({
+            ProcessName: process.name,
+            ActivityName: activity.activityName,
+            pageSize: 10  // Top 10 per activity
+          }, token)
+        )
+    )
+
+    // Step 3: Execute all searches in parallel
+    const results = await Promise.all(taskPromises)
+
+    // Step 4: Flatten all instances
+    const allInstances = results.flatMap(r => r.instances)
+    setAllTasks(allInstances)
+
+    console.log(`Total tasks across all processes: ${allInstances.length}`)
+  }
+
+  return (
+    <div>
+      <h2>All My Tasks ({allTasks.length})</h2>
+      {allTasks.map(task => (
+        <div key={task.instanceId}>
+          <strong>{task.instanceId}</strong>
+          {task.locked && <span>🔒 Locked by {task.lockedBy}</span>}
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+**Pattern 2: Task Filtering and Sorting**
+
+```typescript
+function TaskListWithFilters() {
+  const sdk = useBizuitSDK()
+  const [tasks, setTasks] = useState([])
+  const [filters, setFilters] = useState({
+    dateFrom: '2025-01-01',
+    dateTo: '2025-12-31',
+    lockedState: -1,  // All
+    sortBy: 'executionDateTime',
+    sortOrder: 'desc'
+  })
+
+  const loadTasksWithFilters = async () => {
+    const response = await sdk.tasks.searchTasks({
+      ProcessName: 'TestWix',
+      ActivityName: 'userInteractionActivity1',
+      DateFrom: filters.dateFrom,
+      DateTo: filters.dateTo,
+      LockedState: filters.lockedState,
+      pageNumber: 1,
+      pageSize: 50
+    }, token)
+
+    // Client-side sorting
+    const sorted = [...response.instances].sort((a, b) => {
+      const aVal = a[filters.sortBy]
+      const bVal = b[filters.sortBy]
+
+      if (filters.sortOrder === 'asc') {
+        return aVal > bVal ? 1 : -1
+      } else {
+        return aVal < bVal ? 1 : -1
+      }
+    })
+
+    setTasks(sorted)
+  }
+
+  return (
+    <div>
+      <div className="filters">
+        <input
+          type="date"
+          value={filters.dateFrom}
+          onChange={(e) => setFilters({...filters, dateFrom: e.target.value})}
+        />
+        <input
+          type="date"
+          value={filters.dateTo}
+          onChange={(e) => setFilters({...filters, dateTo: e.target.value})}
+        />
+        <select
+          value={filters.lockedState}
+          onChange={(e) => setFilters({...filters, lockedState: Number(e.target.value)})}
+        >
+          <option value={-1}>All</option>
+          <option value={0}>Available Only</option>
+          <option value={1}>Locked Only</option>
+        </select>
+        <button onClick={loadTasksWithFilters}>Apply Filters</button>
+      </div>
+
+      <table>
+        {/* Render tasks */}
+      </table>
+    </div>
+  )
+}
+```
+
+**Pattern 3: Infinite Scroll / Load More**
+
+```typescript
+function InfiniteTaskList() {
+  const sdk = useBizuitSDK()
+  const [tasks, setTasks] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const pageSize = 20
+
+  const loadMoreTasks = async () => {
+    const response = await sdk.tasks.searchTasks({
+      ProcessName: 'TestWix',
+      ActivityName: 'userInteractionActivity1',
+      pageNumber: currentPage,
+      pageSize: pageSize
+    }, token)
+
+    // Append new tasks
+    setTasks(prev => [...prev, ...response.instances])
+
+    // Check if more pages available
+    const totalCount = response.instancesTotalCount[0]?.count || 0
+    const loadedCount = currentPage * pageSize
+    setHasMore(loadedCount < totalCount)
+
+    setCurrentPage(prev => prev + 1)
+  }
+
+  return (
+    <div>
+      <div className="task-list">
+        {tasks.map(task => (
+          <div key={task.instanceId}>{/* task card */}</div>
+        ))}
+      </div>
+
+      {hasMore && (
+        <button onClick={loadMoreTasks}>
+          Load More Tasks
+        </button>
+      )}
+    </div>
+  )
+}
+```
+
+**Pattern 4: Task Count Badges**
+
+```typescript
+function ProcessNavigationWithBadges() {
+  const sdk = useBizuitSDK()
+  const [processes, setProcesses] = useState([])
+  const [taskCounts, setTaskCounts] = useState({})
+
+  const loadProcessesWithCounts = async (token: string) => {
+    // Load processes
+    const processesData = await sdk.tasks.getProcesses(token)
+    setProcesses(processesData)
+
+    // Load task counts for each activity
+    const countPromises = processesData.flatMap(process =>
+      process.activities.map(async activity => {
+        const count = await sdk.tasks.getTaskCount(
+          process.name,
+          activity.activityName,
+          token
+        )
+        return {
+          key: `${process.name}-${activity.activityName}`,
+          count
+        }
+      })
+    )
+
+    const counts = await Promise.all(countPromises)
+
+    // Convert to map
+    const countMap = {}
+    counts.forEach(({ key, count }) => {
+      countMap[key] = count
+    })
+
+    setTaskCounts(countMap)
+  }
+
+  return (
+    <div>
+      {processes.map(process => (
+        <div key={process.name}>
+          <h3>{process.workflowDisplayName}</h3>
+          {process.activities.map(activity => {
+            const key = `${process.name}-${activity.activityName}`
+            const count = taskCounts[key] || 0
+
+            return (
+              <button key={activity.activityName}>
+                {activity.displayName}
+                {count > 0 && <span className="badge">{count}</span>}
+              </button>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+**Pattern 5: Start Point vs Activities Separation**
+
+```typescript
+function ProcessWorkspace() {
+  const sdk = useBizuitSDK()
+  const [startPoints, setStartPoints] = useState([])
+  const [activities, setActivities] = useState([])
+
+  const loadWorkspace = async (token: string) => {
+    // Get all start points (for creating new instances)
+    const allStartPoints = await sdk.tasks.getStartPoints(token)
+    setStartPoints(allStartPoints)
+
+    // Get all activities (for continuing instances)
+    const allActivities = await sdk.tasks.getActivities(token)
+    setActivities(allActivities)
+  }
+
+  return (
+    <div className="workspace">
+      {/* Left panel: Start new processes */}
+      <aside className="start-points">
+        <h3>Start New Process</h3>
+        {startPoints.map(sp => (
+          <button
+            key={`${sp.processName}-${sp.activityName}`}
+            onClick={() => window.open(sp.connectorUrl)}
+          >
+            🚀 {sp.processDisplayName} - {sp.displayName}
+          </button>
+        ))}
+      </aside>
+
+      {/* Main area: Pending tasks */}
+      <main className="activities">
+        <h3>My Pending Tasks</h3>
+        {activities.map(activity => (
+          <div key={`${activity.processName}-${activity.activityName}`}>
+            <h4>{activity.processDisplayName} - {activity.displayName}</h4>
+            {/* Load tasks for this activity */}
+          </div>
+        ))}
+      </main>
+    </div>
+  )
+}
+```
+
+**TypeScript Type Safety:**
+
+```typescript
+import type {
+  IProcessMetadata,
+  IActivityMetadata,
+  ITaskInstance,
+  ITasksSearchRequest,
+  ITasksSearchResponse,
+  IColumnDefinition,
+} from '@tyconsa/bizuit-form-sdk'
+
+// Strongly typed task list component
+interface TaskListProps {
+  processName: string
+  activityName: string
+  token: string
+}
+
+const TaskList: React.FC<TaskListProps> = ({ processName, activityName, token }) => {
+  const sdk = useBizuitSDK()
+  const [tasks, setTasks] = useState<ITaskInstance[]>([])
+  const [columns, setColumns] = useState<IColumnDefinition[]>([])
+
+  const loadTasks = async () => {
+    const request: ITasksSearchRequest = {
+      ProcessName: processName,
+      ActivityName: activityName,
+      pageNumber: 1,
+      pageSize: 20,
+      LockedState: -1,
+    }
+
+    const response: ITasksSearchResponse = await sdk.tasks.searchTasks(request, token)
+
+    setTasks(response.instances)
+
+    const activity = response.events
+      .find(e => e.eventName === processName)
+      ?.activities.find(a => a.activityName === activityName)
+
+    if (activity) {
+      setColumns(activity.columnsDefinitions)
+    }
+  }
+
+  return (
+    <div>
+      {/* Fully typed task rendering */}
+    </div>
+  )
+}
+```
+
+---
 
 ## Process Workflows
 
