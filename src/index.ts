@@ -22,6 +22,7 @@ export * from './lib/models'
 // React Hooks (client-side only)
 export * from './lib/hooks/useBizuitSDK.tsx'
 export * from './lib/hooks/useAuth.tsx'
+export * from './lib/hooks/useTasks.tsx'
 
 // Version
 export const VERSION = '1.0.0'

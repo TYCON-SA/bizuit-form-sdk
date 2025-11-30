@@ -39,6 +39,7 @@ __export(src_exports, {
   BizuitProcessService: () => BizuitProcessService,
   BizuitSDK: () => BizuitSDK,
   BizuitSDKProvider: () => BizuitSDKProvider,
+  BizuitTaskService: () => BizuitTaskService,
   ParameterParser: () => ParameterParser,
   VERSION: () => VERSION,
   XmlParameter: () => XmlParameter,
@@ -65,6 +66,7 @@ __export(src_exports, {
   releaseInstanceLock: () => releaseInstanceLock,
   useAuth: () => useAuth,
   useBizuitSDK: () => useBizuitSDK,
+  useTasks: () => useTasks,
   xmlToJson: () => xmlToJson
 });
 module.exports = __toCommonJS(src_exports);
@@ -2278,6 +2280,267 @@ var BizuitDataServiceService = class {
   }
 };
 
+// src/lib/api/task-service.ts
+var BizuitTaskService = class {
+  constructor(config) {
+    this.client = new BizuitHttpClient(config);
+    this.apiUrl = config.apiUrl;
+  }
+  /**
+   * Get all processes available to the authenticated user
+   *
+   * @param token - Authorization token (Basic or Bearer)
+   * @returns Array of process metadata with activities
+   *
+   * @example
+   * ```typescript
+   * const sdk = new BizuitSDK({ apiUrl: 'https://api.example.com' })
+   * const processes = await sdk.tasks.getProcesses(authToken)
+   *
+   * processes.forEach(process => {
+   *   console.log(process.workflowDisplayName)
+   *   console.log('Start points:', process.activities.filter(a => a.isStartPoint))
+   *   console.log('Activities:', process.activities.filter(a => !a.isStartPoint))
+   * })
+   * ```
+   */
+  async getProcesses(token) {
+    const headers = {
+      Authorization: token
+    };
+    const result = await this.client.get(
+      `${this.apiUrl}/Processes?isMobile=false`,
+      { headers }
+    );
+    return result;
+  }
+  /**
+   * Get detailed information for a specific process
+   *
+   * @param processName - Process name (eventName)
+   * @param token - Authorization token (Basic or Bearer)
+   * @returns Single process metadata with detailed activity information
+   *
+   * @example
+   * ```typescript
+   * const sdk = new BizuitSDK({ apiUrl: 'https://api.example.com' })
+   * const processDetails = await sdk.tasks.getProcessDetails('TestWix', authToken)
+   *
+   * console.log('Process:', processDetails.workflowDisplayName)
+   * console.log('Activities:', processDetails.activities.length)
+   *
+   * const startPoint = processDetails.activities.find(a => a.isStartPoint)
+   * if (startPoint) {
+   *   console.log('Start point:', startPoint.displayName)
+   *   console.log('Form ID:', startPoint.formId)
+   * }
+   * ```
+   */
+  async getProcessDetails(processName, token) {
+    const headers = {
+      Authorization: token
+    };
+    const result = await this.client.get(
+      `${this.apiUrl}/Processes?eventName=${encodeURIComponent(processName)}&isMobile=false`,
+      { headers }
+    );
+    return result && result.length > 0 ? result[0] : null;
+  }
+  /**
+   * Search for task instances with optional pagination
+   *
+   * @param request - Search parameters including process, activity, and pagination
+   * @param token - Authorization token (Basic or Bearer)
+   * @returns Search response with events, instances, and total count
+   *
+   * @example
+   * ```typescript
+   * const sdk = new BizuitSDK({ apiUrl: 'https://api.example.com' })
+   *
+   * // Basic search
+   * const result = await sdk.tasks.searchTasks({
+   *   ProcessName: 'TestWix',
+   *   ActivityName: 'userInteractionActivity1'
+   * }, authToken)
+   *
+   * console.log('Total instances:', result.instancesTotalCount[0]?.count)
+   * console.log('Instances:', result.instances.length)
+   *
+   * // Search with pagination
+   * const pagedResult = await sdk.tasks.searchTasks({
+   *   ProcessName: 'TestWix',
+   *   ActivityName: 'userInteractionActivity1',
+   *   pageNumber: 1,
+   *   pageSize: 20,
+   *   DateFrom: '2025-01-01',
+   *   DateTo: '2025-12-31',
+   *   LockedState: -1  // -1 = all, 0 = unlocked, 1 = locked
+   * }, authToken)
+   *
+   * // Access instance details
+   * pagedResult.instances.forEach(instance => {
+   *   console.log('Instance ID:', instance.instanceId)
+   *   console.log('Status:', instance.locked ? 'Locked' : 'Available')
+   *   console.log('Locked by:', instance.lockedBy)
+   *
+   *   // Access dynamic columns with user-friendly names (automatically flattened by SDK)
+   *   console.log('Cliente:', instance['CLIENTE'])
+   *   console.log('Descripción:', instance['Descripción'])
+   *   console.log('Versión:', instance['Versión'])
+   *   console.log('Usuario:', instance['Último ejecutado por'])
+   *   console.log('Fecha:', instance['Fecha Ejecución'])
+   *   console.log('Tiempo:', instance['Tiempo Transcurrido'])
+   * })
+   * ```
+   */
+  async searchTasks(request, token) {
+    const headers = {
+      Authorization: token
+    };
+    if (request.pageNumber !== void 0) {
+      headers["bz-page"] = String(request.pageNumber);
+    }
+    if (request.pageSize !== void 0) {
+      headers["bz-page-size"] = String(request.pageSize);
+    }
+    const { pageNumber, pageSize, ...bodyParams } = request;
+    const requestBody = {
+      DateFrom: "1900-01-01",
+      DateTo: "2100-01-01",
+      LockedState: -1,
+      SerializedFilters: "",
+      IncludeWarnings: true,
+      ChildProcessName: "",
+      IsMobile: false,
+      Parameters: [],
+      ...bodyParams
+    };
+    const result = await this.client.post(
+      `${this.apiUrl}/Instances/Search`,
+      requestBody,
+      { headers }
+    );
+    return this.transformSearchResponse(result);
+  }
+  /**
+   * Transform search response to flatten column definition values
+   * Converts columnDefinitionValues array into direct properties on the instance
+   * using headerText as property names for user-friendly access
+   * and removes the original array for a completely flat structure
+   *
+   * @private
+   */
+  transformSearchResponse(response) {
+    const columnHeaderMap = /* @__PURE__ */ new Map();
+    response.events.forEach((event) => {
+      event.activities.forEach((activity) => {
+        activity.columnsDefinitions.forEach((colDef) => {
+          columnHeaderMap.set(colDef.name, colDef.headerText);
+        });
+      });
+    });
+    return {
+      ...response,
+      instances: response.instances.map((instance) => {
+        const flatInstance = { ...instance };
+        instance.columnDefinitionValues.forEach((col) => {
+          const headerText = columnHeaderMap.get(col.columnName) || col.columnName;
+          flatInstance[headerText] = col.value;
+        });
+        delete flatInstance.columnDefinitionValues;
+        delete flatInstance.eventName;
+        delete flatInstance.activityName;
+        delete flatInstance.instanceDescription;
+        return flatInstance;
+      })
+    };
+  }
+  /**
+   * Get task count for a specific process and activity
+   *
+   * @param processName - Process name
+   * @param activityName - Activity name
+   * @param token - Authorization token
+   * @returns Total count of instances
+   *
+   * @example
+   * ```typescript
+   * const count = await sdk.tasks.getTaskCount('TestWix', 'userInteractionActivity1', token)
+   * console.log(`Total tasks: ${count}`)
+   * ```
+   */
+  async getTaskCount(processName, activityName, token) {
+    const result = await this.searchTasks(
+      {
+        ProcessName: processName,
+        ActivityName: activityName,
+        pageSize: 1
+        // Minimal page size to get count only
+      },
+      token
+    );
+    const countData = result.instancesTotalCount.find(
+      (item) => item.eventName === processName
+    );
+    return countData ? countData.count : 0;
+  }
+  /**
+   * Get all start points across all processes
+   *
+   * @param token - Authorization token
+   * @returns Array of activities that are start points
+   *
+   * @example
+   * ```typescript
+   * const startPoints = await sdk.tasks.getStartPoints(token)
+   *
+   * startPoints.forEach(sp => {
+   *   console.log('Process:', sp.processName)
+   *   console.log('Start point:', sp.displayName)
+   *   console.log('Form ID:', sp.formId)
+   * })
+   * ```
+   */
+  async getStartPoints(token) {
+    const processes = await this.getProcesses(token);
+    const startPoints = processes.flatMap(
+      (process2) => process2.activities.filter((activity) => activity.isStartPoint).map((activity) => ({
+        processName: process2.name,
+        processDisplayName: process2.workflowDisplayName,
+        ...activity
+      }))
+    );
+    return startPoints;
+  }
+  /**
+   * Get all activities (non-start points) across all processes
+   *
+   * @param token - Authorization token
+   * @returns Array of activities that are not start points
+   *
+   * @example
+   * ```typescript
+   * const activities = await sdk.tasks.getActivities(token)
+   *
+   * activities.forEach(activity => {
+   *   console.log('Process:', activity.processName)
+   *   console.log('Activity:', activity.displayName)
+   * })
+   * ```
+   */
+  async getActivities(token) {
+    const processes = await this.getProcesses(token);
+    const activities = processes.flatMap(
+      (process2) => process2.activities.filter((activity) => !activity.isStartPoint).map((activity) => ({
+        processName: process2.name,
+        processDisplayName: process2.workflowDisplayName,
+        ...activity
+      }))
+    );
+    return activities;
+  }
+};
+
 // src/lib/api/bizuit-sdk.ts
 var BizuitSDK = class {
   constructor(config) {
@@ -2287,6 +2550,7 @@ var BizuitSDK = class {
     this.instanceLock = new BizuitInstanceLockService(config);
     this.forms = new BizuitFormService(this);
     this.dataService = new BizuitDataServiceService(config);
+    this.tasks = new BizuitTaskService(config);
   }
   /**
    * Get current configuration
@@ -2304,6 +2568,7 @@ var BizuitSDK = class {
     this.instanceLock = new BizuitInstanceLockService(this.config);
     this.forms = new BizuitFormService(this);
     this.dataService = new BizuitDataServiceService(this.config);
+    this.tasks = new BizuitTaskService(this.config);
   }
 };
 
@@ -2739,6 +3004,165 @@ function useAuth(options = {}) {
   };
 }
 
+// src/lib/hooks/useTasks.tsx
+var import_react3 = require("react");
+function useTasks(options) {
+  const sdk = useBizuitSDK();
+  const [processes, setProcesses] = (0, import_react3.useState)(null);
+  const [tasks, setTasks] = (0, import_react3.useState)([]);
+  const [searchResponse, setSearchResponse] = (0, import_react3.useState)(null);
+  const [isLoading, setIsLoading] = (0, import_react3.useState)(false);
+  const [error, setError] = (0, import_react3.useState)(null);
+  const getProcesses = (0, import_react3.useCallback)(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await sdk.tasks.getProcesses(options.token);
+      setProcesses(result);
+    } catch (err) {
+      const error2 = err instanceof Error ? err : new Error("Failed to get processes");
+      setError(error2);
+      throw error2;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sdk, options.token]);
+  const getProcessDetails = (0, import_react3.useCallback)(
+    async (processName) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await sdk.tasks.getProcessDetails(processName, options.token);
+        return result;
+      } catch (err) {
+        const error2 = err instanceof Error ? err : new Error(`Failed to get process details for ${processName}`);
+        setError(error2);
+        throw error2;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [sdk, options.token]
+  );
+  const searchTasks = (0, import_react3.useCallback)(
+    async (request) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await sdk.tasks.searchTasks(request, options.token);
+        setSearchResponse(result);
+        setTasks(result.instances);
+      } catch (err) {
+        const error2 = err instanceof Error ? err : new Error("Failed to search tasks");
+        setError(error2);
+        setSearchResponse(null);
+        setTasks([]);
+        throw error2;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [sdk, options.token]
+  );
+  const getTaskCount = (0, import_react3.useCallback)(
+    async (processName, activityName) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const count = await sdk.tasks.getTaskCount(processName, activityName, options.token);
+        return count;
+      } catch (err) {
+        const error2 = err instanceof Error ? err : new Error("Failed to get task count");
+        setError(error2);
+        throw error2;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [sdk, options.token]
+  );
+  const getStartPoints = (0, import_react3.useCallback)(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await sdk.tasks.getStartPoints(options.token);
+      setProcesses(
+        result.map((sp) => ({
+          name: sp.processName,
+          workflowDisplayName: sp.processDisplayName,
+          workflowName: sp.processName,
+          category: "",
+          subCategory: "",
+          icon: null,
+          iconColor: null,
+          activities: [sp]
+        }))
+      );
+    } catch (err) {
+      const error2 = err instanceof Error ? err : new Error("Failed to get start points");
+      setError(error2);
+      throw error2;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sdk, options.token]);
+  const getActivities = (0, import_react3.useCallback)(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await sdk.tasks.getActivities(options.token);
+      setProcesses(
+        result.map((activity) => ({
+          name: activity.processName,
+          workflowDisplayName: activity.processDisplayName,
+          workflowName: activity.processName,
+          category: "",
+          subCategory: "",
+          icon: null,
+          iconColor: null,
+          activities: [activity]
+        }))
+      );
+    } catch (err) {
+      const error2 = err instanceof Error ? err : new Error("Failed to get activities");
+      setError(error2);
+      throw error2;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sdk, options.token]);
+  const clearError = (0, import_react3.useCallback)(() => {
+    setError(null);
+  }, []);
+  const reset = (0, import_react3.useCallback)(() => {
+    setProcesses(null);
+    setTasks([]);
+    setSearchResponse(null);
+    setError(null);
+    setIsLoading(false);
+  }, []);
+  (0, import_react3.useEffect)(() => {
+    if (options.autoLoadProcesses) {
+      getProcesses();
+    }
+  }, [options.autoLoadProcesses, getProcesses]);
+  return {
+    processes,
+    tasks,
+    searchResponse,
+    isLoading,
+    error,
+    getProcesses,
+    getProcessDetails,
+    searchTasks,
+    getTaskCount,
+    getStartPoints,
+    getActivities,
+    clearError,
+    reset
+  };
+}
+
 // src/index.ts
 var VERSION = "1.0.0";
 // Annotate the CommonJS export names for ESM import in node:
@@ -2752,6 +3176,7 @@ var VERSION = "1.0.0";
   BizuitProcessService,
   BizuitSDK,
   BizuitSDKProvider,
+  BizuitTaskService,
   ParameterParser,
   VERSION,
   XmlParameter,
@@ -2778,6 +3203,7 @@ var VERSION = "1.0.0";
   releaseInstanceLock,
   useAuth,
   useBizuitSDK,
+  useTasks,
   xmlToJson
 });
 //# sourceMappingURL=index.js.map

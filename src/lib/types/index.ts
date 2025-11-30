@@ -6,6 +6,7 @@ export * from './auth.types'
 export * from './process.types'
 export * from './process-flow.types'
 export * from './dataservice.types'
+export * from './tasks.types'
 
 // Common utility types
 export type Result<T, E = Error> =

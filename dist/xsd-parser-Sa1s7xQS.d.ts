@@ -426,6 +426,286 @@ interface IDataServiceExecuteByPageAndNameRequest {
 }
 
 /**
+ * Task-related type definitions for Bizuit BPM task list functionality
+ */
+/**
+ * Activity metadata from process definition
+ */
+interface IActivityMetadata {
+    /** Activity internal name */
+    activityName: string;
+    /** Display name for UI */
+    displayName: string;
+    /** Child event name if applicable */
+    childEventName: string | null;
+    /** Whether this is a process start point */
+    isStartPoint: boolean;
+    /** Whether activity has quick form */
+    hasQuickForm: boolean;
+    /** Whether activity is empty */
+    isEmpty: boolean;
+    /** Connector URL template with placeholders */
+    connectorUrl: string | null;
+    /** Binded connector ID */
+    idBindedConnector: string | null;
+    /** HTML instructions for the activity */
+    instructions: string | null;
+    /** Whether this is the default connector */
+    isDefault: boolean;
+    /** Process version */
+    version: string | null;
+    /** Connector type (WebForm, WebPage, BIZUIT, etc.) */
+    connectorType: string | null;
+    /** Connector width */
+    width: number;
+    /** Connector height */
+    height: number;
+    /** Form name if WebForm connector */
+    formName: string | null;
+    /** Form ID if WebForm connector */
+    formId: number;
+    /** Whether this is a grouping activity */
+    isGroupingActivity: boolean;
+}
+/**
+ * Process metadata with activities and start points
+ */
+interface IProcessMetadata {
+    /** List of activities in the process */
+    activities: IActivityMetadata[];
+    /** Process internal name */
+    name: string;
+    /** Process display name */
+    workflowDisplayName: string;
+    /** Workflow internal name */
+    workflowName: string;
+    /** Process category */
+    category: string;
+    /** Process sub-category */
+    subCategory: string;
+    /** Icon identifier */
+    icon: string | null;
+    /** Icon color */
+    iconColor: string | null;
+}
+/**
+ * Column definition value in task instance
+ */
+interface IColumnDefinitionValue {
+    /** Column name */
+    columnName: string;
+    /** Column value */
+    value: string;
+}
+/**
+ * Task instance from Instances/Search API
+ *
+ * NOTE: The SDK automatically flattens dynamic columns from columnDefinitionValues
+ * into direct properties using user-friendly headerText as property names.
+ * Redundant properties (eventName, activityName, instanceDescription, columnDefinitionValues)
+ * are removed for a clean, flat JSON structure.
+ *
+ * Example usage:
+ * ```typescript
+ * const tasks = await sdk.tasks.searchTasks({
+ *   ProcessName: 'TestWix',
+ *   ActivityName: 'activity1'
+ * }, token)
+ *
+ * tasks.instances.forEach(instance => {
+ *   // Standard properties
+ *   console.log(instance.instanceId)
+ *   console.log(instance.locked)
+ *   console.log(instance.lockedBy)
+ *
+ *   // Dynamic columns with user-friendly names (from headerText)
+ *   console.log(instance['CLIENTE'])               // Direct access with friendly name
+ *   console.log(instance['Descripción'])           // Uses headerText from API
+ *   console.log(instance['Versión'])               // No xCol_* prefixes!
+ *   console.log(instance['Último ejecutado por'])  // User-friendly property names
+ * })
+ * ```
+ */
+interface ITaskInstance {
+    /** Process event name */
+    eventName: string;
+    /** Activity name */
+    activityName: string;
+    /** Instance description */
+    instanceDescription: string;
+    /** Whether instance is locked */
+    locked: boolean;
+    /** Instance unique identifier */
+    instanceId: string;
+    /** Execution date/time display text */
+    executionDateTime: string;
+    /** ISO date string for comparison */
+    dateToCompare: string;
+    /** Warning level ID */
+    warningLevelId: string;
+    /** User who locked the instance */
+    lockedBy: string;
+    /** Background color for UI */
+    backColor: string;
+    /** Foreground color for UI */
+    foreColor: string;
+    /** Number of attached documents */
+    documentsQuantity: number;
+    /** Column definition values (original array format) */
+    columnDefinitionValues: IColumnDefinitionValue[];
+    /** Process version */
+    version: string;
+    /**
+     * Dynamic columns are flattened as direct properties (e.g., xCol_Description, xCol_Version)
+     * TypeScript index signature allows accessing these dynamic properties
+     */
+    [key: string]: any;
+}
+/**
+ * Column definition metadata
+ */
+interface IColumnDefinition {
+    /** Column name */
+    name: string;
+    /** Column header text */
+    headerText: string;
+    /** Column type */
+    type: string;
+    /** Conditions XML */
+    condition: string;
+    /** Date formatting properties */
+    dateProperties: {
+        applyFormat: boolean;
+        format: string;
+        customFormat: string;
+    };
+}
+/**
+ * Connector metadata
+ */
+interface IConnectorMetadata {
+    /** Display name */
+    displayName: string;
+    /** Whether has quick form */
+    hasQuickForm: boolean;
+    /** Binded connector ID */
+    idBindedConnector: number;
+    /** Whether is default connector */
+    isDefault: boolean;
+    /** Connector name */
+    name: string;
+    /** Version */
+    version: string;
+    /** Connector type */
+    connectorType: string;
+    /** Base URL template */
+    baseUrl: string;
+    /** Executable path (for desktop connectors) */
+    executablePath: string | null;
+    /** Width */
+    width: number;
+    /** Height */
+    height: number;
+}
+/**
+ * Activity with connectors from event
+ */
+interface IEventActivity {
+    /** Activity name */
+    activityName: string;
+    /** Whether has quick form */
+    hasQuickForm: boolean;
+    /** Whether has multiple quick forms */
+    hasMultipleQuickForm: boolean;
+    /** Process name to execute for multiple quick forms */
+    multipleQuickFormProcessNameToExecute: string;
+    /** Multiple quick form text */
+    multipleQuickFormText: string;
+    /** Multiple quick form version */
+    multipleQuickFormVersion: string;
+    /** Multiple quick form column restriction */
+    multipleQuickFormColumnRestriction: string;
+    /** Quick form properties */
+    quickFormProperties: any[];
+    /** Binded connector ID */
+    idBindedConnector: string;
+    /** Connector URL template */
+    connectorUrl: string;
+    /** Column definitions */
+    columnsDefinitions: IColumnDefinition[];
+    /** Available connectors */
+    connectors: IConnectorMetadata[];
+    /** Whether is grouping activity */
+    isGroupingActivity: boolean;
+    /** Open settings */
+    openSettings: any | null;
+}
+/**
+ * Event with activities from search response
+ */
+interface ITaskEvent {
+    /** Event name */
+    eventName: string;
+    /** Activities in the event */
+    activities: IEventActivity[];
+}
+/**
+ * Instance count per event
+ */
+interface IInstanceCount {
+    /** Event name */
+    eventName: string;
+    /** Total count of instances */
+    count: number;
+    /** Instances list (null in summary) */
+    instancesList: any | null;
+}
+/**
+ * Parameters for task instance search
+ */
+interface ITasksSearchRequest {
+    /** Process name to search */
+    ProcessName: string;
+    /** Activity name to search */
+    ActivityName: string;
+    /** Expiration interval filter */
+    ExpirationInterval?: string;
+    /** Date from filter (format: YYYY-MM-DD) */
+    DateFrom?: string;
+    /** Date to filter (format: YYYY-MM-DD) */
+    DateTo?: string;
+    /** Locked state filter (-1 = all, 0 = unlocked, 1 = locked) */
+    LockedState?: number;
+    /** Serialized filters */
+    SerializedFilters?: string;
+    /** Include warnings */
+    IncludeWarnings?: boolean;
+    /** Child process name filter */
+    ChildProcessName?: string;
+    /** Is mobile request */
+    IsMobile?: boolean;
+    /** Additional parameters */
+    Parameters?: any[];
+    /** Page number (1-based, sent via bz-page header) */
+    pageNumber?: number;
+    /** Page size (sent via bz-page-size header) */
+    pageSize?: number;
+}
+/**
+ * Response from task instance search
+ */
+interface ITasksSearchResponse {
+    /** Events with activity metadata */
+    events: ITaskEvent[];
+    /** Task instances */
+    instances: ITaskInstance[];
+    /** Whether there are more results than limit */
+    moreThanLimit: boolean;
+    /** Total count per event */
+    instancesTotalCount: IInstanceCount[];
+}
+
+/**
  * Main types export
  */
 
@@ -1621,6 +1901,211 @@ declare class BizuitDataServiceService {
 }
 
 /**
+ * BizuitTaskService
+ *
+ * Service for managing user task lists based on Bizuit BPM permissions.
+ * Provides methods to:
+ * - Get all processes available to user
+ * - Get specific process details
+ * - Search for task instances with pagination
+ */
+
+declare class BizuitTaskService {
+    private client;
+    private apiUrl;
+    constructor(config: IBizuitConfig);
+    /**
+     * Get all processes available to the authenticated user
+     *
+     * @param token - Authorization token (Basic or Bearer)
+     * @returns Array of process metadata with activities
+     *
+     * @example
+     * ```typescript
+     * const sdk = new BizuitSDK({ apiUrl: 'https://api.example.com' })
+     * const processes = await sdk.tasks.getProcesses(authToken)
+     *
+     * processes.forEach(process => {
+     *   console.log(process.workflowDisplayName)
+     *   console.log('Start points:', process.activities.filter(a => a.isStartPoint))
+     *   console.log('Activities:', process.activities.filter(a => !a.isStartPoint))
+     * })
+     * ```
+     */
+    getProcesses(token: string): Promise<IProcessMetadata[]>;
+    /**
+     * Get detailed information for a specific process
+     *
+     * @param processName - Process name (eventName)
+     * @param token - Authorization token (Basic or Bearer)
+     * @returns Single process metadata with detailed activity information
+     *
+     * @example
+     * ```typescript
+     * const sdk = new BizuitSDK({ apiUrl: 'https://api.example.com' })
+     * const processDetails = await sdk.tasks.getProcessDetails('TestWix', authToken)
+     *
+     * console.log('Process:', processDetails.workflowDisplayName)
+     * console.log('Activities:', processDetails.activities.length)
+     *
+     * const startPoint = processDetails.activities.find(a => a.isStartPoint)
+     * if (startPoint) {
+     *   console.log('Start point:', startPoint.displayName)
+     *   console.log('Form ID:', startPoint.formId)
+     * }
+     * ```
+     */
+    getProcessDetails(processName: string, token: string): Promise<IProcessMetadata | null>;
+    /**
+     * Search for task instances with optional pagination
+     *
+     * @param request - Search parameters including process, activity, and pagination
+     * @param token - Authorization token (Basic or Bearer)
+     * @returns Search response with events, instances, and total count
+     *
+     * @example
+     * ```typescript
+     * const sdk = new BizuitSDK({ apiUrl: 'https://api.example.com' })
+     *
+     * // Basic search
+     * const result = await sdk.tasks.searchTasks({
+     *   ProcessName: 'TestWix',
+     *   ActivityName: 'userInteractionActivity1'
+     * }, authToken)
+     *
+     * console.log('Total instances:', result.instancesTotalCount[0]?.count)
+     * console.log('Instances:', result.instances.length)
+     *
+     * // Search with pagination
+     * const pagedResult = await sdk.tasks.searchTasks({
+     *   ProcessName: 'TestWix',
+     *   ActivityName: 'userInteractionActivity1',
+     *   pageNumber: 1,
+     *   pageSize: 20,
+     *   DateFrom: '2025-01-01',
+     *   DateTo: '2025-12-31',
+     *   LockedState: -1  // -1 = all, 0 = unlocked, 1 = locked
+     * }, authToken)
+     *
+     * // Access instance details
+     * pagedResult.instances.forEach(instance => {
+     *   console.log('Instance ID:', instance.instanceId)
+     *   console.log('Status:', instance.locked ? 'Locked' : 'Available')
+     *   console.log('Locked by:', instance.lockedBy)
+     *
+     *   // Access dynamic columns with user-friendly names (automatically flattened by SDK)
+     *   console.log('Cliente:', instance['CLIENTE'])
+     *   console.log('Descripción:', instance['Descripción'])
+     *   console.log('Versión:', instance['Versión'])
+     *   console.log('Usuario:', instance['Último ejecutado por'])
+     *   console.log('Fecha:', instance['Fecha Ejecución'])
+     *   console.log('Tiempo:', instance['Tiempo Transcurrido'])
+     * })
+     * ```
+     */
+    searchTasks(request: ITasksSearchRequest, token: string): Promise<ITasksSearchResponse>;
+    /**
+     * Transform search response to flatten column definition values
+     * Converts columnDefinitionValues array into direct properties on the instance
+     * using headerText as property names for user-friendly access
+     * and removes the original array for a completely flat structure
+     *
+     * @private
+     */
+    private transformSearchResponse;
+    /**
+     * Get task count for a specific process and activity
+     *
+     * @param processName - Process name
+     * @param activityName - Activity name
+     * @param token - Authorization token
+     * @returns Total count of instances
+     *
+     * @example
+     * ```typescript
+     * const count = await sdk.tasks.getTaskCount('TestWix', 'userInteractionActivity1', token)
+     * console.log(`Total tasks: ${count}`)
+     * ```
+     */
+    getTaskCount(processName: string, activityName: string, token: string): Promise<number>;
+    /**
+     * Get all start points across all processes
+     *
+     * @param token - Authorization token
+     * @returns Array of activities that are start points
+     *
+     * @example
+     * ```typescript
+     * const startPoints = await sdk.tasks.getStartPoints(token)
+     *
+     * startPoints.forEach(sp => {
+     *   console.log('Process:', sp.processName)
+     *   console.log('Start point:', sp.displayName)
+     *   console.log('Form ID:', sp.formId)
+     * })
+     * ```
+     */
+    getStartPoints(token: string): Promise<{
+        activityName: string;
+        displayName: string;
+        childEventName: string | null;
+        isStartPoint: boolean;
+        hasQuickForm: boolean;
+        isEmpty: boolean;
+        connectorUrl: string | null;
+        idBindedConnector: string | null;
+        instructions: string | null;
+        isDefault: boolean;
+        version: string | null;
+        connectorType: string | null;
+        width: number;
+        height: number;
+        formName: string | null;
+        formId: number;
+        isGroupingActivity: boolean;
+        processName: string;
+        processDisplayName: string;
+    }[]>;
+    /**
+     * Get all activities (non-start points) across all processes
+     *
+     * @param token - Authorization token
+     * @returns Array of activities that are not start points
+     *
+     * @example
+     * ```typescript
+     * const activities = await sdk.tasks.getActivities(token)
+     *
+     * activities.forEach(activity => {
+     *   console.log('Process:', activity.processName)
+     *   console.log('Activity:', activity.displayName)
+     * })
+     * ```
+     */
+    getActivities(token: string): Promise<{
+        activityName: string;
+        displayName: string;
+        childEventName: string | null;
+        isStartPoint: boolean;
+        hasQuickForm: boolean;
+        isEmpty: boolean;
+        connectorUrl: string | null;
+        idBindedConnector: string | null;
+        instructions: string | null;
+        isDefault: boolean;
+        version: string | null;
+        connectorType: string | null;
+        width: number;
+        height: number;
+        formName: string | null;
+        formId: number;
+        isGroupingActivity: boolean;
+        processName: string;
+        processDisplayName: string;
+    }[]>;
+}
+
+/**
  * Bizuit SDK - Main entry point
  * Provides unified access to all Bizuit services
  */
@@ -1631,6 +2116,7 @@ declare class BizuitSDK {
     instanceLock: BizuitInstanceLockService;
     forms: BizuitFormService;
     dataService: BizuitDataServiceService;
+    tasks: BizuitTaskService;
     private config;
     constructor(config: IBizuitConfig);
     /**
@@ -1924,4 +2410,4 @@ declare function jsonToXml(obj: any, options?: {
  */
 declare function parseXsdToTemplate(xsdString: string): any;
 
-export { type IBizuitProcessParameter as $, type AuthControlType as A, BizuitSDK as B, type ContinueProcessStatus as C, type InstanceLockStatus as D, type IDataServiceParameter as E, type IDataServiceRequest as F, type IDataServiceResponse as G, type IDataServiceMetadata as H, type IBizuitConfig as I, type IDataServiceExecuteByNameRequest as J, type IPageMetadata as K, type IDataServiceExecuteByPageAndNameRequest as L, BizuitHttpClient as M, BizuitAuthService as N, BizuitProcessService as O, type ParameterType as P, BizuitInstanceLockService as Q, type Result as R, type StartProcessStatus as S, BizuitFormService as T, BizuitDataServiceService as U, ParameterParser as V, BizuitError as W, handleError as X, xmlToJson as Y, jsonToXml as Z, parseXsdToTemplate as _, type IUserInfo as a, filterFormParameters as a0, filterContinueParameters as a1, isParameterRequired as a2, getParameterDirectionLabel as a3, getParameterTypeLabel as a4, formDataToParameters as a5, parametersToFormData as a6, createParameter as a7, mergeParameters as a8, type ILockInfo as a9, type ILoadInstanceDataResult as aa, type ILoadInstanceDataOptions as ab, loadInstanceDataForContinue as ac, releaseInstanceLock as ad, processUrlToken as ae, type IParameterMapping as af, buildParameters as ag, parseBizuitUrlParam as ah, createAuthFromUrlToken as ai, buildLoginRedirectUrl as aj, type ErrorContext as ak, formatBizuitError as al, XmlParameter as am, isXmlParameter as an, type IRequestCheckFormAuth as b, type IApiError as c, type IAuthCheckData as d, type IAuthCheckResponse as e, type ILoginSettings as f, type ILoginRequest as g, type ILoginResponse as h, type IBizuitAuthHeaders as i, type ParameterDirection as j, type ProcessStatus as k, type IParameter as l, type IProcessParameter as m, type IInitializeParams as n, type IProcessData as o, type IActivityResult as p, type IStartProcessParams as q, type IProcessResult as r, type IRaiseEventParams as s, type IRaiseEventResult as t, type IEventParameter as u, type IInstanceData as v, type ILockStatus as w, type ILockRequest as x, type IUnlockRequest as y, type ProcessFlowStatus as z };
+export { BizuitAuthService as $, type AuthControlType as A, BizuitSDK as B, type ILockStatus as C, type ILockRequest as D, type IUnlockRequest as E, type ProcessFlowStatus as F, type ContinueProcessStatus as G, type InstanceLockStatus as H, type IBizuitConfig as I, type IDataServiceParameter as J, type IDataServiceRequest as K, type IDataServiceResponse as L, type IDataServiceMetadata as M, type IDataServiceExecuteByNameRequest as N, type IPageMetadata as O, type ParameterType as P, type IDataServiceExecuteByPageAndNameRequest as Q, type Result as R, type StartProcessStatus as S, type IActivityMetadata as T, type IColumnDefinitionValue as U, type IColumnDefinition as V, type IConnectorMetadata as W, type IEventActivity as X, type ITaskEvent as Y, type IInstanceCount as Z, BizuitHttpClient as _, type IUserInfo as a, BizuitProcessService as a0, BizuitInstanceLockService as a1, BizuitFormService as a2, BizuitDataServiceService as a3, BizuitTaskService as a4, ParameterParser as a5, BizuitError as a6, handleError as a7, xmlToJson as a8, jsonToXml as a9, parseXsdToTemplate as aa, type IBizuitProcessParameter as ab, filterFormParameters as ac, filterContinueParameters as ad, isParameterRequired as ae, getParameterDirectionLabel as af, getParameterTypeLabel as ag, formDataToParameters as ah, parametersToFormData as ai, createParameter as aj, mergeParameters as ak, type ILockInfo as al, type ILoadInstanceDataResult as am, type ILoadInstanceDataOptions as an, loadInstanceDataForContinue as ao, releaseInstanceLock as ap, processUrlToken as aq, type IParameterMapping as ar, buildParameters as as, parseBizuitUrlParam as at, createAuthFromUrlToken as au, buildLoginRedirectUrl as av, type ErrorContext as aw, formatBizuitError as ax, XmlParameter as ay, isXmlParameter as az, type IRequestCheckFormAuth as b, type IProcessMetadata as c, type ITaskInstance as d, type ITasksSearchResponse as e, type ITasksSearchRequest as f, type IApiError as g, type IAuthCheckData as h, type IAuthCheckResponse as i, type ILoginSettings as j, type ILoginRequest as k, type ILoginResponse as l, type IBizuitAuthHeaders as m, type ParameterDirection as n, type ProcessStatus as o, type IParameter as p, type IProcessParameter as q, type IInitializeParams as r, type IProcessData as s, type IActivityResult as t, type IStartProcessParams as u, type IProcessResult as v, type IRaiseEventParams as w, type IRaiseEventResult as x, type IEventParameter as y, type IInstanceData as z };
