@@ -8,17 +8,67 @@ vi.mock('../lib/api/http-client', () => {
   return {
     BizuitHttpClient: vi.fn().mockImplementation(() => ({
       post: vi.fn(),
+      get: vi.fn(),
     })),
   }
 })
 
 describe('BizuitDataServiceService', () => {
   let service: BizuitDataServiceService
-  let mockHttpClient: { post: ReturnType<typeof vi.fn> }
+  let mockHttpClient: { post: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> }
   const mockConfig: IBizuitConfig = {
     apiUrl: 'https://test.bizuit.com/bizuitdashboardapi/api',
   }
   const mockToken = 'test-token-123'
+
+  // Helper to create API response with gridData structure
+  const createGridDataResponse = (data: any[]) => {
+    // Handle empty array case
+    if (data.length === 0) {
+      return {
+        gridData: [
+          {
+            rows: []
+          }
+        ]
+      }
+    }
+
+    const columns = Object.keys(data[0] || {}).map(key => ({
+      columnInfo: { columnName: key }
+    }))
+
+    const rows = data.map(item => ({
+      columns: Object.entries(item).map(([key, value]) => ({
+        columnInfo: { columnName: key },
+        value: value
+      }))
+    }))
+
+    return {
+      gridData: [
+        {
+          rows: rows
+        }
+      ]
+    }
+  }
+
+  // Helper to create GetByTabModuleId API response
+  const createTabModuleResponse = (dataServices: Array<{ id: number; name: string }>, tabModuleId: number) => {
+    return {
+      tabModuleID: tabModuleId,
+      configuration: {
+        grid: dataServices.map(ds => ({
+          id: ds.id,
+          title: ds.name, // API uses 'title' not 'name'
+          uniqueId: `ds-${ds.id}`,
+          cacheTime: 0,
+          isGlobalParams: false,
+        }))
+      }
+    }
+  }
 
   beforeEach(() => {
     // Reset mocks
@@ -28,20 +78,17 @@ describe('BizuitDataServiceService', () => {
     service = new BizuitDataServiceService(mockConfig)
 
     // Get mocked http client
-    mockHttpClient = (service as any).client as { post: ReturnType<typeof vi.fn> }
+    mockHttpClient = (service as any).client as { post: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> }
   })
 
   describe('execute', () => {
     it('should execute a simple DataService query', async () => {
-      const mockResponse: IDataServiceResponse = {
-        success: true,
-        data: [
-          { id: 1, code: 'R001', description: 'Invalid data' },
-          { id: 2, code: 'R002', description: 'Missing fields' },
-        ],
-      }
+      const mockData = [
+        { id: 1, code: 'R001', description: 'Invalid data' },
+        { id: 2, code: 'R002', description: 'Missing fields' },
+      ]
 
-      mockHttpClient.post.mockResolvedValueOnce(mockResponse)
+      mockHttpClient.post.mockResolvedValueOnce(createGridDataResponse(mockData))
 
       const result = await service.execute(
         {
@@ -71,12 +118,9 @@ describe('BizuitDataServiceService', () => {
     })
 
     it('should execute query with parameters', async () => {
-      const mockResponse: IDataServiceResponse = {
-        success: true,
-        data: [{ customerId: 'ALFKI', companyName: 'Alfreds Futterkiste' }],
-      }
+      const mockData = [{ customerId: 'ALFKI', companyName: 'Alfreds Futterkiste' }]
 
-      mockHttpClient.post.mockResolvedValueOnce(mockResponse)
+      mockHttpClient.post.mockResolvedValueOnce(createGridDataResponse(mockData))
 
       const result = await service.execute(
         {
@@ -106,12 +150,7 @@ describe('BizuitDataServiceService', () => {
     })
 
     it('should include withoutCache query param', async () => {
-      const mockResponse: IDataServiceResponse = {
-        success: true,
-        data: [],
-      }
-
-      mockHttpClient.post.mockResolvedValueOnce(mockResponse)
+      mockHttpClient.post.mockResolvedValueOnce(createGridDataResponse([]))
 
       await service.execute(
         {
@@ -130,12 +169,7 @@ describe('BizuitDataServiceService', () => {
     })
 
     it('should include executeFromGlobal query param', async () => {
-      const mockResponse: IDataServiceResponse = {
-        success: true,
-        data: [],
-      }
-
-      mockHttpClient.post.mockResolvedValueOnce(mockResponse)
+      mockHttpClient.post.mockResolvedValueOnce(createGridDataResponse([]))
 
       await service.execute(
         {
@@ -183,14 +217,11 @@ describe('BizuitDataServiceService', () => {
         isActive: boolean
       }
 
-      const mockResponse: IDataServiceResponse<RejectionType> = {
-        success: true,
-        data: [
-          { id: 1, code: 'R001', description: 'Invalid', isActive: true },
-        ],
-      }
+      const mockData = [
+        { id: 1, code: 'R001', description: 'Invalid', isActive: true },
+      ]
 
-      mockHttpClient.post.mockResolvedValueOnce(mockResponse)
+      mockHttpClient.post.mockResolvedValueOnce(createGridDataResponse(mockData))
 
       const result = await service.execute<RejectionType>(
         {
@@ -206,12 +237,7 @@ describe('BizuitDataServiceService', () => {
     })
 
     it('should set default values for optional parameters', async () => {
-      const mockResponse: IDataServiceResponse = {
-        success: true,
-        data: [],
-      }
-
-      mockHttpClient.post.mockResolvedValueOnce(mockResponse)
+      mockHttpClient.post.mockResolvedValueOnce(createGridDataResponse([]))
 
       await service.execute(
         {
@@ -286,19 +312,12 @@ describe('BizuitDataServiceService', () => {
 
   describe('executeMany', () => {
     it('should execute multiple DataService queries in parallel', async () => {
-      const mockResponse1: IDataServiceResponse = {
-        success: true,
-        data: [{ id: 1, name: 'Supplier 1' }],
-      }
-
-      const mockResponse2: IDataServiceResponse = {
-        success: true,
-        data: [{ id: 1, status: 'Active' }],
-      }
+      const mockData1 = [{ id: 1, name: 'Supplier 1' }]
+      const mockData2 = [{ id: 1, status: 'Active' }]
 
       mockHttpClient.post
-        .mockResolvedValueOnce(mockResponse1)
-        .mockResolvedValueOnce(mockResponse2)
+        .mockResolvedValueOnce(createGridDataResponse(mockData1))
+        .mockResolvedValueOnce(createGridDataResponse(mockData2))
 
       const results = await service.executeMany(
         [
@@ -319,10 +338,7 @@ describe('BizuitDataServiceService', () => {
     })
 
     it('should handle mixed success and failure', async () => {
-      const mockResponse1: IDataServiceResponse = {
-        success: true,
-        data: [{ id: 1 }],
-      }
+      const mockData1 = [{ id: 1 }]
 
       const mockError = {
         message: 'DataService not found',
@@ -330,7 +346,7 @@ describe('BizuitDataServiceService', () => {
       }
 
       mockHttpClient.post
-        .mockResolvedValueOnce(mockResponse1)
+        .mockResolvedValueOnce(createGridDataResponse(mockData1))
         .mockRejectedValueOnce(mockError)
 
       const results = await service.executeMany(
@@ -365,19 +381,12 @@ describe('BizuitDataServiceService', () => {
         name: string
       }
 
-      const mockResponse1: IDataServiceResponse<Supplier> = {
-        success: true,
-        data: [{ id: 1, name: 'Supplier A' }],
-      }
-
-      const mockResponse2: IDataServiceResponse<Status> = {
-        success: true,
-        data: [{ id: 1, name: 'Active' }],
-      }
+      const mockData1 = [{ id: 1, name: 'Supplier A' }]
+      const mockData2 = [{ id: 1, name: 'Active' }]
 
       mockHttpClient.post
-        .mockResolvedValueOnce(mockResponse1)
-        .mockResolvedValueOnce(mockResponse2)
+        .mockResolvedValueOnce(createGridDataResponse(mockData1))
+        .mockResolvedValueOnce(createGridDataResponse(mockData2))
 
       const results = await service.executeMany<Supplier | Status>(
         [
@@ -394,15 +403,12 @@ describe('BizuitDataServiceService', () => {
 
   describe('Integration scenarios', () => {
     it('should support combo box data loading pattern', async () => {
-      const mockRejectionTypes: IDataServiceResponse = {
-        success: true,
-        data: [
-          { id: 1, code: 'R001', description: 'Invalid data' },
-          { id: 2, code: 'R002', description: 'Missing fields' },
-        ],
-      }
+      const mockData = [
+        { id: 1, code: 'R001', description: 'Invalid data' },
+        { id: 2, code: 'R002', description: 'Missing fields' },
+      ]
 
-      mockHttpClient.post.mockResolvedValueOnce(mockRejectionTypes)
+      mockHttpClient.post.mockResolvedValueOnce(createGridDataResponse(mockData))
 
       const result = await service.execute(
         {
@@ -430,25 +436,14 @@ describe('BizuitDataServiceService', () => {
     })
 
     it('should support loading multiple combos simultaneously', async () => {
-      const mockSuppliers: IDataServiceResponse = {
-        success: true,
-        data: [{ id: 1, name: 'Supplier A' }],
-      }
-
-      const mockStatuses: IDataServiceResponse = {
-        success: true,
-        data: [{ id: 1, name: 'Active' }],
-      }
-
-      const mockPriorities: IDataServiceResponse = {
-        success: true,
-        data: [{ id: 1, name: 'High' }],
-      }
+      const mockSuppliers = [{ id: 1, name: 'Supplier A' }]
+      const mockStatuses = [{ id: 1, name: 'Active' }]
+      const mockPriorities = [{ id: 1, name: 'High' }]
 
       mockHttpClient.post
-        .mockResolvedValueOnce(mockSuppliers)
-        .mockResolvedValueOnce(mockStatuses)
-        .mockResolvedValueOnce(mockPriorities)
+        .mockResolvedValueOnce(createGridDataResponse(mockSuppliers))
+        .mockResolvedValueOnce(createGridDataResponse(mockStatuses))
+        .mockResolvedValueOnce(createGridDataResponse(mockPriorities))
 
       const [suppliers, statuses, priorities] = await service.executeMany(
         [
@@ -471,14 +466,13 @@ describe('BizuitDataServiceService', () => {
   describe('getByTabModuleId', () => {
     it('should fetch all DataServices for a tab module', async () => {
       const mockDataServices = [
-        { id: 1, name: 'Motivos de Rechazo', tabModuleId: 1018, isActive: true },
-        { id: 2, name: 'Estados', tabModuleId: 1018, isActive: true },
-        { id: 3, name: 'Prioridades', tabModuleId: 1018, isActive: true },
+        { id: 1, name: 'Motivos de Rechazo' },
+        { id: 2, name: 'Estados' },
+        { id: 3, name: 'Prioridades' },
       ]
 
-      // Mock GET request
-      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
-      mockHttpClient.get = mockGet
+      // Mock GET request with correct API structure
+      mockHttpClient.get.mockResolvedValueOnce(createTabModuleResponse(mockDataServices, 1018))
 
       const result = await service.getByTabModuleId(1018, mockToken)
 
@@ -488,7 +482,7 @@ describe('BizuitDataServiceService', () => {
       expect(result[2].name).toBe('Prioridades')
 
       // Verify API call
-      expect(mockGet).toHaveBeenCalledWith(
+      expect(mockHttpClient.get).toHaveBeenCalledWith(
         expect.stringContaining('/Dashboard/DataService/GetByTabModuleId?tabModuleId=1018'),
         expect.objectContaining({
           headers: {
@@ -499,8 +493,7 @@ describe('BizuitDataServiceService', () => {
     })
 
     it('should return empty array on error', async () => {
-      const mockGet = vi.fn().mockRejectedValueOnce(new Error('Network error'))
-      mockHttpClient.get = mockGet
+      mockHttpClient.get.mockRejectedValueOnce(new Error('Network error'))
 
       const result = await service.getByTabModuleId(1018, mockToken)
 
@@ -508,8 +501,7 @@ describe('BizuitDataServiceService', () => {
     })
 
     it('should handle empty response', async () => {
-      const mockGet = vi.fn().mockResolvedValueOnce([])
-      mockHttpClient.get = mockGet
+      mockHttpClient.get.mockResolvedValueOnce(createTabModuleResponse([], 1018))
 
       const result = await service.getByTabModuleId(1018, mockToken)
 
@@ -520,23 +512,19 @@ describe('BizuitDataServiceService', () => {
   describe('executeByName', () => {
     it('should find and execute DataService by name', async () => {
       const mockDataServices = [
-        { id: 1, name: 'Motivos de Rechazo', tabModuleId: 1018 },
-        { id: 2, name: 'Estados', tabModuleId: 1018 },
+        { id: 1, name: 'Motivos de Rechazo' },
+        { id: 2, name: 'Estados' },
       ]
 
-      const mockExecuteResponse = {
-        success: true,
-        data: [
-          { id: 1, code: 'R001', description: 'Invalid data' },
-        ],
-      }
+      const mockData = [
+        { id: 1, code: 'R001', description: 'Invalid data' },
+      ]
 
       // Mock getByTabModuleId
-      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
-      mockHttpClient.get = mockGet
+      mockHttpClient.get.mockResolvedValueOnce(createTabModuleResponse(mockDataServices, 1018))
 
       // Mock execute
-      mockHttpClient.post.mockResolvedValueOnce(mockExecuteResponse)
+      mockHttpClient.post.mockResolvedValueOnce(createGridDataResponse(mockData))
 
       const result = await service.executeByName({
         tabModuleId: 1018,
@@ -549,7 +537,7 @@ describe('BizuitDataServiceService', () => {
       expect(result.data[0].code).toBe('R001')
 
       // Verify getByTabModuleId was called
-      expect(mockGet).toHaveBeenCalled()
+      expect(mockHttpClient.get).toHaveBeenCalled()
 
       // Verify execute was called with correct ID
       expect(mockHttpClient.post).toHaveBeenCalledWith(
@@ -564,11 +552,10 @@ describe('BizuitDataServiceService', () => {
 
     it('should return error if DataService not found', async () => {
       const mockDataServices = [
-        { id: 1, name: 'Estados', tabModuleId: 1018 },
+        { id: 1, name: 'Estados' },
       ]
 
-      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
-      mockHttpClient.get = mockGet
+      mockHttpClient.get.mockResolvedValueOnce(createTabModuleResponse(mockDataServices, 1018))
 
       const result = await service.executeByName({
         tabModuleId: 1018,
@@ -584,13 +571,11 @@ describe('BizuitDataServiceService', () => {
 
     it('should support cache control', async () => {
       const mockDataServices = [
-        { id: 1, name: 'Test DS', tabModuleId: 1018 },
+        { id: 1, name: 'Test DS' },
       ]
 
-      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
-      mockHttpClient.get = mockGet
-
-      mockHttpClient.post.mockResolvedValueOnce({ success: true, data: [] })
+      mockHttpClient.get.mockResolvedValueOnce(createTabModuleResponse(mockDataServices, 1018))
+      mockHttpClient.post.mockResolvedValueOnce(createGridDataResponse([]))
 
       await service.executeByName({
         tabModuleId: 1018,
@@ -610,12 +595,11 @@ describe('BizuitDataServiceService', () => {
   describe('findByName', () => {
     it('should find DataService by name', async () => {
       const mockDataServices = [
-        { id: 1, name: 'Motivos de Rechazo', tabModuleId: 1018 },
-        { id: 2, name: 'Estados', tabModuleId: 1018 },
+        { id: 1, name: 'Motivos de Rechazo' },
+        { id: 2, name: 'Estados' },
       ]
 
-      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
-      mockHttpClient.get = mockGet
+      mockHttpClient.get.mockResolvedValueOnce(createTabModuleResponse(mockDataServices, 1018))
 
       const result = await service.findByName(1018, 'Estados', mockToken)
 
@@ -626,11 +610,10 @@ describe('BizuitDataServiceService', () => {
 
     it('should return null if not found', async () => {
       const mockDataServices = [
-        { id: 1, name: 'Estados', tabModuleId: 1018 },
+        { id: 1, name: 'Estados' },
       ]
 
-      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
-      mockHttpClient.get = mockGet
+      mockHttpClient.get.mockResolvedValueOnce(createTabModuleResponse(mockDataServices, 1018))
 
       const result = await service.findByName(1018, 'NonExistent', mockToken)
 
@@ -644,20 +627,16 @@ describe('BizuitDataServiceService', () => {
       // Only needs: tabModuleId (page ID) + DataService name
 
       const mockDataServices = [
-        { id: 42, name: 'Motivos de Rechazo', tabModuleId: 1018 },
+        { id: 42, name: 'Motivos de Rechazo' },
       ]
 
-      const mockRejectionTypes = {
-        success: true,
-        data: [
-          { id: 1, code: 'R001', description: 'Invalid data' },
-          { id: 2, code: 'R002', description: 'Missing fields' },
-        ],
-      }
+      const mockData = [
+        { id: 1, code: 'R001', description: 'Invalid data' },
+        { id: 2, code: 'R002', description: 'Missing fields' },
+      ]
 
-      const mockGet = vi.fn().mockResolvedValueOnce(mockDataServices)
-      mockHttpClient.get = mockGet
-      mockHttpClient.post.mockResolvedValueOnce(mockRejectionTypes)
+      mockHttpClient.get.mockResolvedValueOnce(createTabModuleResponse(mockDataServices, 1018))
+      mockHttpClient.post.mockResolvedValueOnce(createGridDataResponse(mockData))
 
       // Simple, descriptive API
       const result = await service.executeByName({

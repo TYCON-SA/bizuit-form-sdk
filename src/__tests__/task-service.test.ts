@@ -252,7 +252,19 @@ describe('BizuitTaskService', () => {
           },
         }
       )
-      expect(result).toEqual(mockResponse)
+
+      // Service transforms instances by removing redundant fields
+      expect(result.events).toEqual(mockResponse.events)
+      expect(result.moreThanLimit).toBe(mockResponse.moreThanLimit)
+      expect(result.instancesTotalCount).toEqual(mockResponse.instancesTotalCount)
+      expect(result.instances).toHaveLength(1)
+      expect(result.instances[0].instanceId).toBe('inst-123')
+      expect(result.instances[0].locked).toBe(false)
+      // These fields are removed by transformSearchResponse
+      expect(result.instances[0]).not.toHaveProperty('columnDefinitionValues')
+      expect(result.instances[0]).not.toHaveProperty('eventName')
+      expect(result.instances[0]).not.toHaveProperty('activityName')
+      expect(result.instances[0]).not.toHaveProperty('instanceDescription')
     })
 
     it('should include pagination headers when provided', async () => {
