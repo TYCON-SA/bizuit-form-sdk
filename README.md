@@ -6,7 +6,11 @@ Core SDK for Bizuit BPM form integration. Provides authentication, process manag
 
 - ✅ **Authentication & Authorization** - Token validation, user info, permission checks
 - ✅ **Process Management** - Initialize, start and continue processes, handle parameters
-- ✅ **File Uploads** - Upload files with Dashboard API multipart/form-data support (v2.4.0+)
+- ✅ **Flexible File Uploads** - Upload from multiple sources: Base64, Blob, ArrayBuffer, File (v2.4.0+)
+  - 📷 Base64 strings (camera, canvas, data URLs)
+  - 🎨 Blob objects (canvas.toBlob, fetch responses)
+  - 📦 ArrayBuffer (binary data, WebSocket)
+  - 📂 Browser File objects (traditional inputs)
 - ✅ **Instance Locking** - Pessimistic locking for concurrent access control
 - ✅ **DataService Queries** - Fetch lookup data, lists, and reports from BIZUIT Dashboard (v2.2.0+)
 - ✅ **Task List Management** - Retrieve user tasks based on BPM permissions with flattened JSON (v2.3.0+)
@@ -1995,9 +1999,314 @@ try {
 }
 ```
 
+## 📁 Flexible File Uploads ✨ NEW in v2.4.0
+
+The SDK now supports **multiple file sources** for uploads, not just browser `File` objects. This makes it easy to upload files from:
+- 📷 **Base64 strings** (camera captures, canvas exports, data URLs)
+- 🎨 **Blob objects** (canvas.toBlob(), fetch responses)
+- 📦 **ArrayBuffer** (binary data, WebSocket transfers)
+- 📂 **Browser File objects** (traditional file inputs)
+
+### Quick Example: Upload Base64 Image
+
+```typescript
+import { useBizuitSDK } from '@tyconsa/bizuit-form-sdk'
+
+function UploadSignature() {
+  const sdk = useBizuitSDK()
+
+  const handleSubmit = async (signatureBase64: string) => {
+    // Create IBizuitFile from base64 string
+    const signatureFile = {
+      fileName: 'signature.png',
+      content: signatureBase64,  // Can be data URL or pure base64
+      mimeType: 'image/png',
+      encoding: 'base64' as const
+    }
+
+    // Upload directly - SDK handles conversion!
+    const result = await sdk.process.start(
+      {
+        processName: 'DocumentApproval',
+        parameters: [
+          { name: 'pApproved', value: 'true', type: 'SingleValue', direction: 'In' }
+        ],
+        files: [signatureFile]  // ← IBizuitFile instead of File!
+      },
+      undefined,
+      token
+    )
+
+    console.log('Uploaded!', result.instanceId)
+  }
+
+  return <SignaturePad onSave={handleSubmit} />
+}
+```
+
+### Supported File Sources
+
+#### 1. Base64 Strings 📷
+
+Perfect for camera captures, canvas exports, or server-provided data:
+
+```typescript
+// From canvas.toDataURL()
+const dataUrl = canvas.toDataURL('image/jpeg')
+const file: IBizuitFile = {
+  fileName: 'photo.jpg',
+  content: dataUrl,  // SDK strips "data:image/jpeg;base64," prefix
+  mimeType: 'image/jpeg',
+  encoding: 'base64'
+}
+
+// Pure base64 string
+const base64 = 'iVBORw0KGgoAAAANSUhEUgAA...'
+const file2: IBizuitFile = {
+  fileName: 'document.pdf',
+  content: base64,
+  mimeType: 'application/pdf',
+  encoding: 'base64'
+}
+
+await sdk.process.start({
+  processName: 'UploadDocs',
+  parameters: [],
+  files: [file, file2]
+}, undefined, token)
+```
+
+#### 2. Blob Objects 🎨
+
+Perfect for canvas exports, fetch responses, or binary data:
+
+```typescript
+// From canvas
+canvas.toBlob(async (blob) => {
+  const file: IBizuitFile = {
+    fileName: 'drawing.png',
+    content: blob!,
+    mimeType: 'image/png'
+  }
+
+  await sdk.process.start({
+    processName: 'UploadDrawing',
+    parameters: [],
+    files: [file]
+  }, undefined, token)
+})
+
+// From fetch
+const response = await fetch('https://example.com/document.pdf')
+const blob = await response.blob()
+
+const file: IBizuitFile = {
+  fileName: 'remote-doc.pdf',
+  content: blob,
+  mimeType: blob.type || 'application/pdf'
+}
+```
+
+#### 3. ArrayBuffer 📦
+
+Perfect for binary data, WebSocket transfers, or FileReader results:
+
+```typescript
+// From fetch
+const response = await fetch('https://example.com/data.bin')
+const arrayBuffer = await response.arrayBuffer()
+
+const file: IBizuitFile = {
+  fileName: 'data.bin',
+  content: arrayBuffer,
+  mimeType: 'application/octet-stream'
+}
+
+await sdk.process.start({
+  processName: 'UploadBinary',
+  parameters: [],
+  files: [file]
+}, undefined, token)
+```
+
+#### 4. Browser File Objects 📂
+
+Traditional file input still works - fully backward compatible:
+
+```typescript
+const fileInput = document.getElementById('fileInput') as HTMLInputElement
+const browserFiles = Array.from(fileInput.files || [])
+
+// Old way still works!
+await sdk.process.start(
+  { processName: 'UploadDocs', parameters: [] },
+  browserFiles,  // File[]
+  token
+)
+
+// Or using IBizuitFile wrapper
+const wrapped: IBizuitFile = {
+  fileName: 'document.pdf',
+  content: browserFiles[0],  // Wrap File in IBizuitFile
+  mimeType: browserFiles[0].type
+}
+```
+
+### Mixed File Sources
+
+You can mix different file sources in the same upload:
+
+```typescript
+const files = [
+  // Browser file
+  browserFile,
+
+  // Base64 signature
+  {
+    fileName: 'signature.png',
+    content: signatureBase64,
+    mimeType: 'image/png',
+    encoding: 'base64' as const
+  },
+
+  // Canvas blob
+  {
+    fileName: 'drawing.png',
+    content: canvasBlob,
+    mimeType: 'image/png'
+  }
+]
+
+await sdk.process.start({
+  processName: 'SubmitForm',
+  parameters: [...],
+  files: files  // Mix of File and IBizuitFile!
+}, undefined, token)
+```
+
+### Real-World Use Cases
+
+**Camera Capture:**
+```typescript
+// Capture photo and upload as base64
+const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+const canvas = document.createElement('canvas')
+// ... capture frame to canvas
+const base64Image = canvas.toDataURL('image/jpeg')
+
+await sdk.process.start({
+  processName: 'UploadPhoto',
+  parameters: [],
+  files: [{
+    fileName: 'photo.jpg',
+    content: base64Image,
+    mimeType: 'image/jpeg',
+    encoding: 'base64'
+  }]
+}, undefined, token)
+```
+
+**Download and Re-upload:**
+```typescript
+// Download from one instance
+const blob = await sdk.process.downloadDocument(docId, version, token)
+
+// Upload to another instance
+await sdk.process.start({
+  processName: 'CopyDocument',
+  parameters: [],
+  files: [{
+    fileName: 'copied-doc.pdf',
+    content: blob,
+    mimeType: blob.type
+  }]
+}, undefined, token)
+```
+
+**Generate PDF from HTML:**
+```typescript
+import jsPDF from 'jspdf'
+
+const doc = new jsPDF()
+doc.text('Report Content', 10, 10)
+const pdfBlob = doc.output('blob')
+
+await sdk.process.start({
+  processName: 'SubmitReport',
+  parameters: [],
+  files: [{
+    fileName: 'report.pdf',
+    content: pdfBlob,
+    mimeType: 'application/pdf'
+  }]
+}, undefined, token)
+```
+
+### TypeScript Interface
+
+```typescript
+interface IBizuitFile {
+  fileName: string                              // Name for uploaded file
+  content: File | string | Blob | ArrayBuffer   // File content from any source
+  mimeType?: string                             // MIME type (e.g., 'image/png')
+  encoding?: 'base64' | 'binary'                // Encoding (only for strings)
+}
+
+// Usage in process params
+interface IStartProcessParams {
+  processName: string
+  instanceId?: string
+  parameters: IParameter[]
+  processVersion?: string
+  closeOnSuccess?: boolean
+  deletedDocuments?: string[]
+  files?: File[] | IBizuitFile[]  // ← Supports both!
+}
+```
+
+### Continue Operations
+
+The same flexible file support works for `continue()` operations:
+
+```typescript
+await sdk.process.continue({
+  processName: 'DocumentReview',
+  instanceId: 'existing-instance-id',
+  parameters: [...],
+  files: [
+    {
+      fileName: 'additional-doc.pdf',
+      content: base64String,
+      mimeType: 'application/pdf',
+      encoding: 'base64'
+    }
+  ],
+  deletedDocuments: ['16', '17']  // Remove old docs
+}, undefined, token)
+```
+
+### Important Notes
+
+✅ **Backward Compatible** - Existing code using `File[]` still works
+✅ **Automatic Conversion** - SDK converts all sources to `File` objects before sending
+✅ **Data URL Detection** - Automatically strips `data:image/png;base64,` prefixes
+✅ **MIME Type Inference** - Uses sensible defaults if not provided
+✅ **Error Handling** - Clear error messages for malformed base64
+
+For complete examples and HTML test forms, see **[EXAMPLES_FILE_UPLOAD.md](./EXAMPLES_FILE_UPLOAD.md)**.
+
+---
+
 ## 📚 Documentation
 
 For detailed guides and advanced features:
+
+- **[File Upload Examples](./EXAMPLES_FILE_UPLOAD.md)** - Complete guide with 9 examples showing all file upload patterns
+  - Base64 string uploads (camera, canvas, data URLs)
+  - Blob uploads (canvas.toBlob, fetch responses)
+  - ArrayBuffer uploads (binary data, WebSocket)
+  - Mixed file sources in same upload
+  - Real-world use cases (camera, PDF generation, download/re-upload)
 
 - **[XmlParameter Guide](./XMLPARAMETER_GUIDE.md)** - Complete guide for working with XML parameters using mutable objects
   - XSD auto-template generation
