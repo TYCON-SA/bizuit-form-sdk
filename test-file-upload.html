@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test File Upload - Dashboard API</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .file-list {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .file-item-name {
+            flex: 1;
+            color: #333;
+        }
+
+        .file-item-size {
+            color: #666;
+            font-size: 12px;
+            margin-right: 10px;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-delete:hover {
+            background: #c82333;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: #0066cc;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #0052a3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #218838;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .instance-info {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .instance-info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .instance-info-label {
+            font-weight: 500;
+            color: #666;
+        }
+
+        .instance-info-value {
+            color: #333;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sección 1: Crear instancia -->
+    <div class="container" id="createSection">
+        <h1>🔧 Test File Upload - Dashboard API</h1>
+        <p class="subtitle">Prueba de subida de archivos usando Dashboard API - Proceso: TestUploadDocs</p>
+
+        <div class="form-group">
+            <label>Dashboard API URL:</label>
+            <input type="text" id="dashboardUrl" value="https://test.bizuit.com/arielschBIZUITDashboardAPI/api">
+        </div>
+
+        <div class="form-group">
+            <label>Usuario:</label>
+            <input type="text" id="username" value="admin" placeholder="Usuario Bizuit">
+        </div>
+
+        <div class="form-group">
+            <label>Contraseña:</label>
+            <input type="password" id="password" placeholder="Contraseña">
+        </div>
+
+        <div class="form-group">
+            <label>📎 Seleccionar archivos (Browser File):</label>
+            <input type="file" id="fileInput" multiple>
+            <div class="file-list" id="fileList">No hay archivos seleccionados</div>
+        </div>
+
+        <div class="form-group">
+            <label>📝 Archivo Base64 (opcional):</label>
+            <textarea id="base64Input" placeholder="Pega contenido base64 o data URL aquí..." style="width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px;"></textarea>
+            <input type="text" id="base64FileName" placeholder="Nombre del archivo (ej: documento.pdf)" style="margin-top: 5px;">
+            <input type="text" id="base64MimeType" placeholder="MIME type (ej: application/pdf)" style="margin-top: 5px;">
+            <button class="btn-secondary" id="addBase64Btn" style="margin-top: 5px;">➕ Agregar archivo Base64</button>
+            <div class="file-list" id="base64FileList"></div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-primary" id="startBtn">▶️ Crear Instancia con Archivos</button>
+        </div>
+
+        <div id="status"></div>
+    </div>
+
+    <!-- Sección 2: Gestionar instancia (oculta inicialmente) -->
+    <div class="container hidden" id="manageSection">
+        <h2>📋 Gestionar Instancia</h2>
+
+        <div class="instance-info" id="instanceInfo"></div>
+
+        <div class="form-group">
+            <label>🗂️ Archivos actuales:</label>
+            <div class="file-list" id="currentFilesList">Cargando...</div>
+        </div>
+
+        <div class="form-group">
+            <label>➕ Agregar más archivos (Browser File):</label>
+            <input type="file" id="addFileInput" multiple>
+            <div class="file-list" id="addFileList">No hay archivos seleccionados</div>
+        </div>
+
+        <div class="form-group">
+            <label>📝 Archivo Base64 adicional (opcional):</label>
+            <textarea id="addBase64Input" placeholder="Pega contenido base64 o data URL aquí..." style="width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px;"></textarea>
+            <input type="text" id="addBase64FileName" placeholder="Nombre del archivo (ej: documento.pdf)" style="margin-top: 5px;">
+            <input type="text" id="addBase64MimeType" placeholder="MIME type (ej: application/pdf)" style="margin-top: 5px;">
+            <button class="btn-secondary" id="addMoreBase64Btn" style="margin-top: 5px;">➕ Agregar archivo Base64</button>
+            <div class="file-list" id="addBase64FileList"></div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-secondary" id="refreshBtn">🔄 Actualizar Datos</button>
+            <button class="btn-success" id="continueBtn">💾 Guardar Cambios (Continue)</button>
+            <button class="btn-primary" id="newInstanceBtn">➕ Nueva Instancia</button>
+        </div>
+
+        <div id="manageStatus"></div>
+    </div>
+
+    <script>
+        // Global state
+        let selectedFiles = [];
+        let selectedBase64Files = []; // Array of {fileName, content, mimeType}
+        let addFiles = [];
+        let addBase64Files = []; // Array of {fileName, content, mimeType}
+        let currentInstance = null;
+        let currentInstanceId = null;
+        let currentProcessName = 'TestUploadDocs'; // Track the process name
+        let currentFiles = [];
+        let filesToDelete = [];
+        let authToken = null;
+
+        // DOM elements - Create section
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const base64Input = document.getElementById('base64Input');
+        const base64FileName = document.getElementById('base64FileName');
+        const base64MimeType = document.getElementById('base64MimeType');
+        const addBase64Btn = document.getElementById('addBase64Btn');
+        const base64FileList = document.getElementById('base64FileList');
+        const startBtn = document.getElementById('startBtn');
+        const statusDiv = document.getElementById('status');
+
+        // DOM elements - Manage section
+        const manageSection = document.getElementById('manageSection');
+        const createSection = document.getElementById('createSection');
+        const instanceInfo = document.getElementById('instanceInfo');
+        const currentFilesList = document.getElementById('currentFilesList');
+        const addFileInput = document.getElementById('addFileInput');
+        const addFileList = document.getElementById('addFileList');
+        const addBase64Input = document.getElementById('addBase64Input');
+        const addBase64FileName = document.getElementById('addBase64FileName');
+        const addBase64MimeType = document.getElementById('addBase64MimeType');
+        const addMoreBase64Btn = document.getElementById('addMoreBase64Btn');
+        const addBase64FileList = document.getElementById('addBase64FileList');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const continueBtn = document.getElementById('continueBtn');
+        const newInstanceBtn = document.getElementById('newInstanceBtn');
+        const manageStatus = document.getElementById('manageStatus');
+
+        // Update file list display (create section)
+        fileInput.addEventListener('change', (e) => {
+            selectedFiles = Array.from(e.target.files);
+            if (selectedFiles.length > 0) {
+                fileList.innerHTML = selectedFiles.map((f, i) =>
+                    `<div>${i + 1}. ${f.name} (${(f.size / 1024).toFixed(2)} KB)</div>`
+                ).join('');
+            } else {
+                fileList.innerHTML = 'No hay archivos seleccionados';
+            }
+        });
+
+        // Update add files list (manage section)
+        addFileInput.addEventListener('change', (e) => {
+            addFiles = Array.from(e.target.files);
+            if (addFiles.length > 0) {
+                addFileList.innerHTML = addFiles.map((f, i) =>
+                    `<div>${i + 1}. ${f.name} (${(f.size / 1024).toFixed(2)} KB)</div>`
+                ).join('');
+            } else {
+                addFileList.innerHTML = 'No hay archivos seleccionados';
+            }
+        });
+
+        // Add base64 file (create section)
+        addBase64Btn.addEventListener('click', () => {
+            const content = base64Input.value.trim();
+            const fileName = base64FileName.value.trim();
+            const mimeType = base64MimeType.value.trim();
+
+            if (!content || !fileName) {
+                alert('Por favor ingresa el contenido base64 y el nombre del archivo');
+                return;
+            }
+
+            selectedBase64Files.push({
+                fileName: fileName,
+                content: content,
+                mimeType: mimeType || 'application/octet-stream'
+            });
+
+            // Clear inputs
+            base64Input.value = '';
+            base64FileName.value = '';
+            base64MimeType.value = '';
+
+            // Update display
+            updateBase64FileList();
+        });
+
+        // Add base64 file (manage section)
+        addMoreBase64Btn.addEventListener('click', () => {
+            const content = addBase64Input.value.trim();
+            const fileName = addBase64FileName.value.trim();
+            const mimeType = addBase64MimeType.value.trim();
+
+            if (!content || !fileName) {
+                alert('Por favor ingresa el contenido base64 y el nombre del archivo');
+                return;
+            }
+
+            addBase64Files.push({
+                fileName: fileName,
+                content: content,
+                mimeType: mimeType || 'application/octet-stream'
+            });
+
+            // Clear inputs
+            addBase64Input.value = '';
+            addBase64FileName.value = '';
+            addBase64MimeType.value = '';
+
+            // Update display
+            updateAddBase64FileList();
+        });
+
+        // Update base64 file list display (create section)
+        function updateBase64FileList() {
+            if (selectedBase64Files.length > 0) {
+                base64FileList.innerHTML = selectedBase64Files.map((f, i) =>
+                    `<div class="file-item">
+                        <span class="file-item-name">📄 ${f.fileName} (${f.mimeType})</span>
+                        <button onclick="removeBase64File(${i})" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">🗑️ Eliminar</button>
+                    </div>`
+                ).join('');
+            } else {
+                base64FileList.innerHTML = '';
+            }
+        }
+
+        // Update add base64 file list display (manage section)
+        function updateAddBase64FileList() {
+            if (addBase64Files.length > 0) {
+                addBase64FileList.innerHTML = addBase64Files.map((f, i) =>
+                    `<div class="file-item">
+                        <span class="file-item-name">📄 ${f.fileName} (${f.mimeType})</span>
+                        <button onclick="removeAddBase64File(${i})" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">🗑️ Eliminar</button>
+                    </div>`
+                ).join('');
+            } else {
+                addBase64FileList.innerHTML = '';
+            }
+        }
+
+        // Remove base64 file (create section)
+        window.removeBase64File = function(index) {
+            selectedBase64Files.splice(index, 1);
+            updateBase64FileList();
+        };
+
+        // Remove base64 file (manage section)
+        window.removeAddBase64File = function(index) {
+            addBase64Files.splice(index, 1);
+            updateAddBase64FileList();
+        };
+
+        // Show status message
+        function showStatus(message, type = 'info', details = null, targetDiv = statusDiv) {
+            targetDiv.className = `status ${type}`;
+            let html = `<strong>${message}</strong>`;
+
+            if (details) {
+                if (typeof details === 'object') {
+                    html += `<pre style="margin-top: 10px; white-space: pre-wrap;">${JSON.stringify(details, null, 2)}</pre>`;
+                } else {
+                    html += `<div style="margin-top: 10px;">${details}</div>`;
+                }
+            }
+
+            targetDiv.innerHTML = html;
+        }
+
+        // Get auth token
+        async function getAuthToken() {
+            if (authToken) return authToken;
+
+            const dashboardUrl = document.getElementById('dashboardUrl').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            const authString = `${username}:${password}`;
+            const base64Auth = btoa(authString);
+
+            const loginResponse = await axios.get(
+                `${dashboardUrl}/Login`,
+                {
+                    headers: {
+                        'Authorization': `Basic ${base64Auth}`
+                    }
+                }
+            );
+
+            authToken = decodeURIComponent(loginResponse.data.token);
+            return authToken;
+        }
+
+        // Get instance data
+        async function getInstanceData(instanceId) {
+            const dashboardUrl = document.getElementById('dashboardUrl').value;
+            const token = await getAuthToken();
+
+            const response = await axios.get(
+                `${dashboardUrl}/instances?instanceId=${instanceId}`,
+                {
+                    headers: {
+                        'BZ-AUTH-TOKEN': token
+                    }
+                }
+            );
+
+            return response.data;
+        }
+
+        // Get instance documents
+        async function getInstanceDocuments(instanceId) {
+            const dashboardUrl = document.getElementById('dashboardUrl').value;
+            const token = await getAuthToken();
+
+            try {
+                const response = await axios.get(
+                    `${dashboardUrl}/instances/${instanceId}/documents`,
+                    {
+                        headers: {
+                            'BZ-AUTH-TOKEN': token
+                        }
+                    }
+                );
+
+                console.log('Documents response:', response.data);
+                return response.data || [];
+            } catch (error) {
+                console.error('Error fetching documents:', error);
+                return [];
+            }
+        }
+
+        // Download document
+        async function downloadDocument(documentId, version, fileName) {
+            const dashboardUrl = document.getElementById('dashboardUrl').value;
+            const token = await getAuthToken();
+
+            try {
+                showStatus('⏳ Descargando archivo...', 'info', null, manageStatus);
+
+                const response = await axios.get(
+                    `${dashboardUrl}/instances/documents/${documentId}/${version}`,
+                    {
+                        headers: {
+                            'BZ-AUTH-TOKEN': token
+                        },
+                        responseType: 'blob'
+                    }
+                );
+
+                // Create download link
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', fileName);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+
+                showStatus('✅ Archivo descargado: ' + fileName, 'success', null, manageStatus);
+            } catch (error) {
+                console.error('Error downloading document:', error);
+                showStatus('❌ Error al descargar archivo', 'error', error.response?.data || error.message, manageStatus);
+            }
+        }
+
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // Display instance info
+        function displayInstanceInfo(instanceData) {
+            const status = instanceData?.status || instanceData?.Status || 'N/A';
+            instanceInfo.innerHTML = `
+                <div class="instance-info-row">
+                    <span class="instance-info-label">Instance ID:</span>
+                    <span class="instance-info-value">${currentInstanceId || 'N/A'}</span>
+                </div>
+                <div class="instance-info-row">
+                    <span class="instance-info-label">Process:</span>
+                    <span class="instance-info-value">${currentProcessName}</span>
+                </div>
+                <div class="instance-info-row">
+                    <span class="instance-info-label">Status:</span>
+                    <span class="instance-info-value">${status}</span>
+                </div>
+            `;
+        }
+
+        // Display current files
+        function displayCurrentFiles() {
+            if (currentFiles.length === 0) {
+                currentFilesList.innerHTML = '<div>No hay archivos adjuntos</div>';
+                return;
+            }
+
+            currentFilesList.innerHTML = currentFiles.map((doc, index) => {
+                // Support both formats: dashboard API format and docs API format
+                const fileName = doc.fileName || doc.FileName || 'undefined';
+                const fileId = doc.fileId || doc.ID;
+                const fileVersion = doc.fileVersion || doc.Version || 1;
+
+                // Check if marked for deletion by fileId (not fileName)
+                const isMarkedForDeletion = filesToDelete.some(id => id === String(fileId));
+                const fileSize = 'N/A'; // Size not available in this endpoint
+
+                return `
+                    <div class="file-item" style="${isMarkedForDeletion ? 'opacity: 0.5; text-decoration: line-through;' : ''}">
+                        <span class="file-item-name">📄 ${fileName}</span>
+                        <span class="file-item-size">${fileSize}</span>
+                        <button class="btn-delete" onclick="downloadDocument(${fileId}, ${fileVersion}, '${fileName}')" style="background: #007bff; margin-right: 5px;" ${isMarkedForDeletion ? 'disabled' : ''}>
+                            ⬇️ Descargar
+                        </button>
+                        <button class="btn-delete" onclick="toggleFileDelete('${fileId}')" ${isMarkedForDeletion ? 'style="background: #6c757d;"' : ''}>
+                            ${isMarkedForDeletion ? '↩️ Restaurar' : '🗑️ Eliminar'}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Toggle file deletion (now uses fileId instead of fileName)
+        window.toggleFileDelete = function(fileId) {
+            const fileIdStr = String(fileId);
+            const index = filesToDelete.indexOf(fileIdStr);
+            if (index > -1) {
+                filesToDelete.splice(index, 1);
+            } else {
+                filesToDelete.push(fileIdStr);
+            }
+            displayCurrentFiles();
+        };
+
+        // Load instance data
+        async function loadInstanceData(instanceId) {
+            try {
+                showStatus('⏳ Cargando datos de la instancia...', 'info', null, manageStatus);
+
+                // Store the instance ID
+                currentInstanceId = instanceId;
+
+                const instanceData = await getInstanceData(instanceId);
+                currentInstance = instanceData;
+
+                // Get documents using the new API endpoint
+                currentFiles = await getInstanceDocuments(instanceId);
+
+                displayInstanceInfo(instanceData);
+                displayCurrentFiles();
+
+                showStatus('✅ Datos cargados correctamente', 'success', null, manageStatus);
+            } catch (error) {
+                console.error('Error loading instance:', error);
+                showStatus('❌ Error al cargar datos de la instancia', 'error', error.response?.data || error.message, manageStatus);
+            }
+        }
+
+        // Create instance with files
+        startBtn.addEventListener('click', async () => {
+            const dashboardUrl = document.getElementById('dashboardUrl').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                showStatus('⚠️ Error: Usuario y contraseña requeridos', 'error');
+                return;
+            }
+
+            if (selectedFiles.length === 0 && selectedBase64Files.length === 0) {
+                showStatus('⚠️ Error: Seleccionar al menos un archivo (Browser o Base64)', 'error');
+                return;
+            }
+
+            startBtn.disabled = true;
+            showStatus('⏳ Autenticando...', 'info');
+
+            try {
+                const token = await getAuthToken();
+                showStatus(`⏳ Creando instancia con ${selectedFiles.length} archivo(s) browser y ${selectedBase64Files.length} archivo(s) base64...`, 'info');
+
+                const data = {
+                    eventName: 'TestUploadDocs',
+                    eventVersion: '1.0.0.0',
+                    parameters: [],
+                    parametersString: null,
+                    instanceId: '',
+                    returnString: true,
+                    closeOnSuccess: false,  // Changed to false to keep instance open
+                    deletedDocuments: []
+                };
+
+                const jsonString = JSON.stringify(data);
+                const base64Data = btoa(jsonString);
+
+                const formData = new FormData();
+                formData.append('data', base64Data);
+
+                // Add browser files
+                selectedFiles.forEach((file) => {
+                    formData.append(file.name, file, file.name);
+                });
+
+                // Add base64 files (convert to File objects)
+                selectedBase64Files.forEach((b64File) => {
+                    // Remove data URL prefix if present
+                    const base64Content = b64File.content.includes(',') ?
+                        b64File.content.split(',')[1] : b64File.content;
+
+                    // Decode base64 to binary
+                    const binaryString = atob(base64Content);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+
+                    // Create File from bytes
+                    const file = new File([bytes], b64File.fileName, { type: b64File.mimeType });
+                    formData.append(file.name, file, file.name);
+                });
+
+                const response = await axios.post(
+                    `${dashboardUrl}/instances/RaiseEvent`,
+                    formData,
+                    {
+                        headers: {
+                            'BZ-AUTH-TOKEN': token
+                        }
+                    }
+                );
+
+                console.log('Response from RaiseEvent:', response.data);
+
+                // Check if we have a valid instanceId (API can return instanceId or InstanceId)
+                const instanceId = response.data.instanceId || response.data.InstanceId;
+                if (!response.data || !instanceId) {
+                    throw new Error('No se recibió instanceId en la respuesta: ' + JSON.stringify(response.data));
+                }
+
+                // Store instance ID and instance data
+                currentInstanceId = instanceId;
+                currentInstance = response.data;
+
+                showStatus(
+                    '✅ Instancia creada exitosamente!',
+                    'success',
+                    {
+                        instanceId: instanceId,
+                        status: response.data.status || response.data.Status,
+                        filesUploaded: selectedFiles.length
+                    }
+                );
+
+                // Wait a bit before loading instance data
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Switch to manage section
+                await loadInstanceData(instanceId);
+                createSection.classList.add('hidden');
+                manageSection.classList.remove('hidden');
+
+                // Scroll to manage section
+                manageSection.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('❌ Error al crear instancia', 'error', error.response?.data || error.message);
+                startBtn.disabled = false;
+            }
+        });
+
+        // Refresh instance data
+        refreshBtn.addEventListener('click', async () => {
+            if (!currentInstanceId) return;
+
+            refreshBtn.disabled = true;
+            await loadInstanceData(currentInstanceId);
+            refreshBtn.disabled = false;
+        });
+
+        // Continue instance with changes
+        continueBtn.addEventListener('click', async () => {
+            if (!currentInstanceId) return;
+
+            const dashboardUrl = document.getElementById('dashboardUrl').value;
+
+            continueBtn.disabled = true;
+            showStatus('⏳ Guardando cambios...', 'info', null, manageStatus);
+
+            try {
+                const token = await getAuthToken();
+
+                const data = {
+                    eventName: currentProcessName,
+                    eventVersion: '1.0.0.0',
+                    parameters: [],
+                    parametersString: null,
+                    instanceId: currentInstanceId,
+                    returnString: true,
+                    closeOnSuccess: false,
+                    deletedDocuments: filesToDelete
+                };
+
+                const jsonString = JSON.stringify(data);
+                const base64Data = btoa(jsonString);
+
+                const formData = new FormData();
+                formData.append('data', base64Data);
+
+                // Add new browser files
+                addFiles.forEach((file) => {
+                    formData.append(file.name, file, file.name);
+                });
+
+                // Add new base64 files (convert to File objects)
+                addBase64Files.forEach((b64File) => {
+                    // Remove data URL prefix if present
+                    const base64Content = b64File.content.includes(',') ?
+                        b64File.content.split(',')[1] : b64File.content;
+
+                    // Decode base64 to binary
+                    const binaryString = atob(base64Content);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+
+                    // Create File from bytes
+                    const file = new File([bytes], b64File.fileName, { type: b64File.mimeType });
+                    formData.append(file.name, file, file.name);
+                });
+
+                const response = await axios.post(
+                    `${dashboardUrl}/instances/RaiseEvent`,
+                    formData,
+                    {
+                        headers: {
+                            'BZ-AUTH-TOKEN': token
+                        }
+                    }
+                );
+
+                showStatus(
+                    '✅ Cambios guardados exitosamente!',
+                    'success',
+                    {
+                        instanceId: response.data.instanceId || response.data.InstanceId,
+                        status: response.data.status || response.data.Status,
+                        filesAdded: addFiles.length + addBase64Files.length,
+                        filesDeleted: filesToDelete.length
+                    },
+                    manageStatus
+                );
+
+                // Reset state
+                addFiles = [];
+                addBase64Files = [];
+                filesToDelete = [];
+                addFileInput.value = '';
+                addFileList.innerHTML = 'No hay archivos seleccionados';
+                addBase64FileList.innerHTML = '';
+
+                // Reload instance data
+                await loadInstanceData(currentInstanceId);
+
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('❌ Error al guardar cambios', 'error', error.response?.data || error.message, manageStatus);
+            } finally {
+                continueBtn.disabled = false;
+            }
+        });
+
+        // New instance button
+        newInstanceBtn.addEventListener('click', () => {
+            // Reset all state
+            currentInstance = null;
+            currentFiles = [];
+            filesToDelete = [];
+            selectedFiles = [];
+            selectedBase64Files = [];
+            addFiles = [];
+            addBase64Files = [];
+            authToken = null;
+
+            // Reset inputs
+            fileInput.value = '';
+            addFileInput.value = '';
+            fileList.innerHTML = 'No hay archivos seleccionados';
+            addFileList.innerHTML = 'No hay archivos seleccionados';
+            base64FileList.innerHTML = '';
+            addBase64FileList.innerHTML = '';
+
+            // Switch back to create section
+            manageSection.classList.add('hidden');
+            createSection.classList.remove('hidden');
+            startBtn.disabled = false;
+
+            // Scroll to top
+            createSection.scrollIntoView({ behavior: 'smooth' });
+
+            showStatus('📋 Ingresar credenciales y seleccionar archivos para crear nueva instancia', 'info');
+        });
+
+        // Initial message
+        showStatus('📋 Ingresar credenciales y seleccionar archivos para subir', 'info');
+    </script>
+</body>
+</html>

@@ -11,6 +11,7 @@ import type {
   IProcessData,
   IStartProcessParams,
   IProcessResult,
+  IBizuitFile,
 } from '../types'
 import { xmlToJson, jsonToXml } from '../utils/xml-parser'
 import { parseXsdToTemplate } from '../utils/xsd-parser'
@@ -102,7 +103,7 @@ export class BizuitProcessService {
    */
   async start(
     params: IStartProcessParams,
-    files?: File[],
+    files?: File[] | IBizuitFile[],
     token?: string
   ): Promise<IProcessResult> {
     const headers: Record<string, string> = {
@@ -164,17 +165,28 @@ export class BizuitProcessService {
       payload.deletedDocuments = params.deletedDocuments
     }
 
-    // Note: File upload support would require multipart/form-data
-    // For now, we're implementing JSON-only as per the curl examples
-    if (files && files.length > 0) {
-      console.warn('File upload in start is not yet implemented in JSON mode')
-    }
+    // Determine which files to use: from params or from files parameter
+    const filesToUpload = params.files || files
 
-    const result = await this.client.post<IProcessResult>(
-      `${this.apiUrl}/instances`,
-      payload,
-      { headers }
-    )
+    let result: IProcessResult
+
+    // Use multipart/form-data when files are present
+    if (filesToUpload && filesToUpload.length > 0) {
+      // Dashboard API: POST /api/instances/RaiseEvent with multipart
+      result = await this.client.postMultipart<IProcessResult>(
+        `${this.apiUrl}/instances/RaiseEvent`,
+        payload,
+        filesToUpload,
+        { headers: { 'BZ-AUTH-TOKEN': token } }
+      )
+    } else {
+      // Standard JSON request (existing behavior - no changes)
+      result = await this.client.post<IProcessResult>(
+        `${this.apiUrl}/instances`,
+        payload,
+        { headers }
+      )
+    }
 
     // Automatically parse XML parameters to JSON
     // Note: API returns tyconParameters, but we map it to parameters
@@ -326,7 +338,7 @@ export class BizuitProcessService {
    */
   async continue(
     params: IStartProcessParams,
-    files?: File[],
+    files?: File[] | IBizuitFile[],
     token?: string
   ): Promise<IProcessResult> {
     if (!params.instanceId) {
@@ -386,15 +398,28 @@ export class BizuitProcessService {
       payload.deletedDocuments = params.deletedDocuments
     }
 
-    if (files && files.length > 0) {
-      console.warn('File upload in continue is not yet implemented in JSON mode')
-    }
+    // Determine which files to use: from params or from files parameter
+    const filesToUpload = params.files || files
 
-    const result = await this.client.put<IProcessResult>(
-      `${this.apiUrl}/instances`,
-      payload,
-      { headers }
-    )
+    let result: IProcessResult
+
+    // Use multipart/form-data when files are present
+    if (filesToUpload && filesToUpload.length > 0) {
+      // Dashboard API: POST /api/instances/RaiseEvent with multipart (continues also use POST)
+      result = await this.client.postMultipart<IProcessResult>(
+        `${this.apiUrl}/instances/RaiseEvent`,
+        payload,
+        filesToUpload,
+        { headers: { 'BZ-AUTH-TOKEN': token } }
+      )
+    } else {
+      // Standard JSON request (existing behavior - no changes)
+      result = await this.client.put<IProcessResult>(
+        `${this.apiUrl}/instances`,
+        payload,
+        { headers }
+      )
+    }
 
     // Automatically parse XML parameters to JSON
     // Note: API returns tyconParameters, but we map it to parameters
@@ -527,5 +552,72 @@ export class BizuitProcessService {
     )
 
     return result
+  }
+
+  /**
+   * Get instance documents
+   * Returns list of documents attached to an instance
+   *
+   * Example:
+   * GET /api/instances/{instanceId}/documents
+   * BZ-AUTH-TOKEN: token
+   *
+   * @param instanceId - Instance ID
+   * @param token - Authentication token
+   * @returns Array of document metadata with ID, FileName, Size, Version, etc.
+   */
+  async getDocuments(instanceId: string, token?: string): Promise<any[]> {
+    const headers: Record<string, string> = {}
+
+    if (token) {
+      headers['BZ-AUTH-TOKEN'] = token
+    }
+
+    try {
+      const response = await this.client.get<any[]>(
+        `${this.apiUrl}/instances/${instanceId}/documents`,
+        { headers }
+      )
+      return response || []
+    } catch (error) {
+      console.error('Error fetching instance documents:', error)
+      return []
+    }
+  }
+
+  /**
+   * Download a document from an instance
+   * Returns the document as a Blob
+   *
+   * Example:
+   * GET /api/instances/documents/{documentId}/{version}
+   * BZ-AUTH-TOKEN: token
+   * Response: Binary data (Blob)
+   *
+   * @param documentId - Document ID
+   * @param version - Document version
+   * @param token - Authentication token
+   * @returns Document blob
+   */
+  async downloadDocument(
+    documentId: number,
+    version: number,
+    token?: string
+  ): Promise<Blob> {
+    const headers: Record<string, string> = {}
+
+    if (token) {
+      headers['BZ-AUTH-TOKEN'] = token
+    }
+
+    const response = await this.client.get<Blob>(
+      `${this.apiUrl}/instances/documents/${documentId}/${version}`,
+      {
+        headers,
+        responseType: 'blob'
+      }
+    )
+
+    return response
   }
 }

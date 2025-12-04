@@ -179,6 +179,65 @@ var BizuitHttpClient = class {
     return response.data;
   }
   /**
+   * Convert IBizuitFile to File object
+   */
+  convertToFile(bizuitFile) {
+    const { fileName, content, mimeType, encoding } = bizuitFile;
+    if (content instanceof File) {
+      return content;
+    }
+    if (content instanceof Blob) {
+      return new File([content], fileName, { type: mimeType || content.type });
+    }
+    if (content instanceof ArrayBuffer) {
+      return new File([content], fileName, { type: mimeType || "application/octet-stream" });
+    }
+    if (typeof content === "string") {
+      try {
+        const base64String = content.includes(",") ? content.split(",")[1] : content;
+        const binaryString = atob(base64String);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return new File([bytes], fileName, { type: mimeType || "application/octet-stream" });
+      } catch (error) {
+        throw new Error(`Failed to decode base64 string for file ${fileName}: ${error}`);
+      }
+    }
+    throw new Error(`Unsupported content type for file ${fileName}`);
+  }
+  /**
+   * POST request with multipart/form-data for Dashboard API file uploads
+   * - Encodes JSON data as Base64 in 'data' field
+   * - Appends files with their actual filenames
+   * - Supports both File[] and IBizuitFile[] for flexible file sources
+   */
+  async postMultipart(url, data, files, config) {
+    const formData = new FormData();
+    const jsonString = JSON.stringify(data);
+    const base64Data = btoa(jsonString);
+    formData.append("data", base64Data);
+    const fileObjects = files.map((file) => {
+      if (file instanceof File) {
+        return file;
+      }
+      return this.convertToFile(file);
+    });
+    fileObjects.forEach((file) => {
+      formData.append(file.name, file, file.name);
+    });
+    const requestConfig = {
+      ...config,
+      headers: {
+        ...config?.headers,
+        "Content-Type": "multipart/form-data"
+      }
+    };
+    const response = await this.axiosInstance.post(url, formData, requestConfig);
+    return response.data;
+  }
+  /**
    * Add Bizuit-specific headers to request
    */
   withBizuitHeaders(headers) {
@@ -1066,14 +1125,22 @@ var BizuitProcessService = class {
     if (params.deletedDocuments && params.deletedDocuments.length > 0) {
       payload.deletedDocuments = params.deletedDocuments;
     }
-    if (files && files.length > 0) {
-      console.warn("File upload in start is not yet implemented in JSON mode");
+    const filesToUpload = params.files || files;
+    let result;
+    if (filesToUpload && filesToUpload.length > 0) {
+      result = await this.client.postMultipart(
+        `${this.apiUrl}/instances/RaiseEvent`,
+        payload,
+        filesToUpload,
+        { headers: { "BZ-AUTH-TOKEN": token } }
+      );
+    } else {
+      result = await this.client.post(
+        `${this.apiUrl}/instances`,
+        payload,
+        { headers }
+      );
     }
-    const result = await this.client.post(
-      `${this.apiUrl}/instances`,
-      payload,
-      { headers }
-    );
     const parametersArray = result.tyconParameters || result.parameters;
     if (parametersArray && Array.isArray(parametersArray)) {
       parametersArray.forEach((param) => {
@@ -1227,14 +1294,22 @@ var BizuitProcessService = class {
     if (params.deletedDocuments && params.deletedDocuments.length > 0) {
       payload.deletedDocuments = params.deletedDocuments;
     }
-    if (files && files.length > 0) {
-      console.warn("File upload in continue is not yet implemented in JSON mode");
+    const filesToUpload = params.files || files;
+    let result;
+    if (filesToUpload && filesToUpload.length > 0) {
+      result = await this.client.postMultipart(
+        `${this.apiUrl}/instances/RaiseEvent`,
+        payload,
+        filesToUpload,
+        { headers: { "BZ-AUTH-TOKEN": token } }
+      );
+    } else {
+      result = await this.client.put(
+        `${this.apiUrl}/instances`,
+        payload,
+        { headers }
+      );
     }
-    const result = await this.client.put(
-      `${this.apiUrl}/instances`,
-      payload,
-      { headers }
-    );
     const parametersArray = result.tyconParameters || result.parameters;
     if (parametersArray && Array.isArray(parametersArray)) {
       parametersArray.forEach((param) => {
@@ -1334,6 +1409,62 @@ var BizuitProcessService = class {
       { headers }
     );
     return result;
+  }
+  /**
+   * Get instance documents
+   * Returns list of documents attached to an instance
+   *
+   * Example:
+   * GET /api/instances/{instanceId}/documents
+   * BZ-AUTH-TOKEN: token
+   *
+   * @param instanceId - Instance ID
+   * @param token - Authentication token
+   * @returns Array of document metadata with ID, FileName, Size, Version, etc.
+   */
+  async getDocuments(instanceId, token) {
+    const headers = {};
+    if (token) {
+      headers["BZ-AUTH-TOKEN"] = token;
+    }
+    try {
+      const response = await this.client.get(
+        `${this.apiUrl}/instances/${instanceId}/documents`,
+        { headers }
+      );
+      return response || [];
+    } catch (error) {
+      console.error("Error fetching instance documents:", error);
+      return [];
+    }
+  }
+  /**
+   * Download a document from an instance
+   * Returns the document as a Blob
+   *
+   * Example:
+   * GET /api/instances/documents/{documentId}/{version}
+   * BZ-AUTH-TOKEN: token
+   * Response: Binary data (Blob)
+   *
+   * @param documentId - Document ID
+   * @param version - Document version
+   * @param token - Authentication token
+   * @returns Document blob
+   */
+  async downloadDocument(documentId, version, token) {
+    const headers = {};
+    if (token) {
+      headers["BZ-AUTH-TOKEN"] = token;
+    }
+    const response = await this.client.get(
+      `${this.apiUrl}/instances/documents/${documentId}/${version}`,
+      {
+        headers,
+        responseType: "blob"
+      }
+    );
+    return response;
   }
 };
 

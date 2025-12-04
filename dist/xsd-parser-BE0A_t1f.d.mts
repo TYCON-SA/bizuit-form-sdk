@@ -133,6 +133,16 @@ interface IActivityResult {
     completedDate?: string;
     status: string;
 }
+/**
+ * Flexible file attachment interface for Bizuit SDK
+ * Supports multiple file sources: browser File objects, base64 strings, Blobs, and ArrayBuffers
+ */
+interface IBizuitFile {
+    fileName: string;
+    content: File | string | Blob | ArrayBuffer;
+    mimeType?: string;
+    encoding?: 'base64' | 'binary';
+}
 interface IStartProcessParams {
     processName: string;
     instanceId?: string;
@@ -140,6 +150,7 @@ interface IStartProcessParams {
     processVersion?: string;
     closeOnSuccess?: boolean;
     deletedDocuments?: string[];
+    files?: File[] | IBizuitFile[];
 }
 interface IProcessResult {
     instanceId: string;
@@ -761,6 +772,17 @@ declare class BizuitHttpClient {
      */
     delete<T>(url: string, config?: AxiosRequestConfig): Promise<T>;
     /**
+     * Convert IBizuitFile to File object
+     */
+    private convertToFile;
+    /**
+     * POST request with multipart/form-data for Dashboard API file uploads
+     * - Encodes JSON data as Base64 in 'data' field
+     * - Appends files with their actual filenames
+     * - Supports both File[] and IBizuitFile[] for flexible file sources
+     */
+    postMultipart<T>(url: string, data: any, files: File[] | IBizuitFile[], config?: AxiosRequestConfig): Promise<T>;
+    /**
      * Add Bizuit-specific headers to request
      */
     withBizuitHeaders(headers: IBizuitAuthHeaders): BizuitHttpClient;
@@ -1057,7 +1079,7 @@ declare class BizuitProcessService {
      *   ]
      * }
      */
-    start(params: IStartProcessParams, files?: File[], token?: string): Promise<IProcessResult>;
+    start(params: IStartProcessParams, files?: File[] | IBizuitFile[], token?: string): Promise<IProcessResult>;
     /**
      * Get process parameters schema
      * Useful for dynamic form generation
@@ -1113,7 +1135,7 @@ declare class BizuitProcessService {
      *   "instanceId": "e3137f94-0ab5-4ae7-b256-10806fe92958"
      * }
      */
-    continue(params: IStartProcessParams, files?: File[], token?: string): Promise<IProcessResult>;
+    continue(params: IStartProcessParams, files?: File[] | IBizuitFile[], token?: string): Promise<IProcessResult>;
     /**
      * Get process parameters as XmlParameter objects (NEW in v2.1.0)
      *
@@ -1148,6 +1170,34 @@ declare class BizuitProcessService {
      * @returns Configuration settings object
      */
     getConfigurationSettings(organizationId: string, token?: string): Promise<Record<string, any>>;
+    /**
+     * Get instance documents
+     * Returns list of documents attached to an instance
+     *
+     * Example:
+     * GET /api/instances/{instanceId}/documents
+     * BZ-AUTH-TOKEN: token
+     *
+     * @param instanceId - Instance ID
+     * @param token - Authentication token
+     * @returns Array of document metadata with ID, FileName, Size, Version, etc.
+     */
+    getDocuments(instanceId: string, token?: string): Promise<any[]>;
+    /**
+     * Download a document from an instance
+     * Returns the document as a Blob
+     *
+     * Example:
+     * GET /api/instances/documents/{documentId}/{version}
+     * BZ-AUTH-TOKEN: token
+     * Response: Binary data (Blob)
+     *
+     * @param documentId - Document ID
+     * @param version - Document version
+     * @param token - Authentication token
+     * @returns Document blob
+     */
+    downloadDocument(documentId: number, version: number, token?: string): Promise<Blob>;
 }
 
 /**
@@ -2410,4 +2460,4 @@ declare function jsonToXml(obj: any, options?: {
  */
 declare function parseXsdToTemplate(xsdString: string): any;
 
-export { BizuitAuthService as $, type AuthControlType as A, BizuitSDK as B, type ILockStatus as C, type ILockRequest as D, type IUnlockRequest as E, type ProcessFlowStatus as F, type ContinueProcessStatus as G, type InstanceLockStatus as H, type IBizuitConfig as I, type IDataServiceParameter as J, type IDataServiceRequest as K, type IDataServiceResponse as L, type IDataServiceMetadata as M, type IDataServiceExecuteByNameRequest as N, type IPageMetadata as O, type ParameterType as P, type IDataServiceExecuteByPageAndNameRequest as Q, type Result as R, type StartProcessStatus as S, type IActivityMetadata as T, type IColumnDefinitionValue as U, type IColumnDefinition as V, type IConnectorMetadata as W, type IEventActivity as X, type ITaskEvent as Y, type IInstanceCount as Z, BizuitHttpClient as _, type IUserInfo as a, BizuitProcessService as a0, BizuitInstanceLockService as a1, BizuitFormService as a2, BizuitDataServiceService as a3, BizuitTaskService as a4, ParameterParser as a5, BizuitError as a6, handleError as a7, xmlToJson as a8, jsonToXml as a9, parseXsdToTemplate as aa, type IBizuitProcessParameter as ab, filterFormParameters as ac, filterContinueParameters as ad, isParameterRequired as ae, getParameterDirectionLabel as af, getParameterTypeLabel as ag, formDataToParameters as ah, parametersToFormData as ai, createParameter as aj, mergeParameters as ak, type ILockInfo as al, type ILoadInstanceDataResult as am, type ILoadInstanceDataOptions as an, loadInstanceDataForContinue as ao, releaseInstanceLock as ap, processUrlToken as aq, type IParameterMapping as ar, buildParameters as as, parseBizuitUrlParam as at, createAuthFromUrlToken as au, buildLoginRedirectUrl as av, type ErrorContext as aw, formatBizuitError as ax, XmlParameter as ay, isXmlParameter as az, type IRequestCheckFormAuth as b, type IProcessMetadata as c, type ITaskInstance as d, type ITasksSearchResponse as e, type ITasksSearchRequest as f, type IApiError as g, type IAuthCheckData as h, type IAuthCheckResponse as i, type ILoginSettings as j, type ILoginRequest as k, type ILoginResponse as l, type IBizuitAuthHeaders as m, type ParameterDirection as n, type ProcessStatus as o, type IParameter as p, type IProcessParameter as q, type IInitializeParams as r, type IProcessData as s, type IActivityResult as t, type IStartProcessParams as u, type IProcessResult as v, type IRaiseEventParams as w, type IRaiseEventResult as x, type IEventParameter as y, type IInstanceData as z };
+export { BizuitHttpClient as $, type AuthControlType as A, BizuitSDK as B, type IInstanceData as C, type ILockStatus as D, type ILockRequest as E, type IUnlockRequest as F, type ProcessFlowStatus as G, type ContinueProcessStatus as H, type IBizuitConfig as I, type InstanceLockStatus as J, type IDataServiceParameter as K, type IDataServiceRequest as L, type IDataServiceResponse as M, type IDataServiceMetadata as N, type IDataServiceExecuteByNameRequest as O, type ParameterType as P, type IPageMetadata as Q, type Result as R, type StartProcessStatus as S, type IDataServiceExecuteByPageAndNameRequest as T, type IActivityMetadata as U, type IColumnDefinitionValue as V, type IColumnDefinition as W, type IConnectorMetadata as X, type IEventActivity as Y, type ITaskEvent as Z, type IInstanceCount as _, type IUserInfo as a, BizuitAuthService as a0, BizuitProcessService as a1, BizuitInstanceLockService as a2, BizuitFormService as a3, BizuitDataServiceService as a4, BizuitTaskService as a5, ParameterParser as a6, BizuitError as a7, handleError as a8, xmlToJson as a9, isXmlParameter as aA, jsonToXml as aa, parseXsdToTemplate as ab, type IBizuitProcessParameter as ac, filterFormParameters as ad, filterContinueParameters as ae, isParameterRequired as af, getParameterDirectionLabel as ag, getParameterTypeLabel as ah, formDataToParameters as ai, parametersToFormData as aj, createParameter as ak, mergeParameters as al, type ILockInfo as am, type ILoadInstanceDataResult as an, type ILoadInstanceDataOptions as ao, loadInstanceDataForContinue as ap, releaseInstanceLock as aq, processUrlToken as ar, type IParameterMapping as as, buildParameters as at, parseBizuitUrlParam as au, createAuthFromUrlToken as av, buildLoginRedirectUrl as aw, type ErrorContext as ax, formatBizuitError as ay, XmlParameter as az, type IRequestCheckFormAuth as b, type IProcessMetadata as c, type ITaskInstance as d, type ITasksSearchResponse as e, type ITasksSearchRequest as f, type IApiError as g, type IAuthCheckData as h, type IAuthCheckResponse as i, type ILoginSettings as j, type ILoginRequest as k, type ILoginResponse as l, type IBizuitAuthHeaders as m, type ParameterDirection as n, type ProcessStatus as o, type IParameter as p, type IProcessParameter as q, type IInitializeParams as r, type IProcessData as s, type IActivityResult as t, type IBizuitFile as u, type IStartProcessParams as v, type IProcessResult as w, type IRaiseEventParams as x, type IRaiseEventResult as y, type IEventParameter as z };

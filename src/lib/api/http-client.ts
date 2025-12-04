@@ -4,7 +4,7 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios'
-import type { IBizuitConfig, IApiError, IBizuitAuthHeaders } from '../types'
+import type { IBizuitConfig, IApiError, IBizuitAuthHeaders, IBizuitFile } from '../types'
 
 export class BizuitHttpClient {
   private axiosInstance: AxiosInstance
@@ -134,6 +134,92 @@ export class BizuitHttpClient {
    */
   async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.axiosInstance.delete<T>(url, config)
+    return response.data
+  }
+
+  /**
+   * Convert IBizuitFile to File object
+   */
+  private convertToFile(bizuitFile: IBizuitFile): File {
+    const { fileName, content, mimeType, encoding } = bizuitFile
+
+    // If already a File, return as-is
+    if (content instanceof File) {
+      return content
+    }
+
+    // If Blob, create File from it
+    if (content instanceof Blob) {
+      return new File([content], fileName, { type: mimeType || content.type })
+    }
+
+    // If ArrayBuffer, create File from it
+    if (content instanceof ArrayBuffer) {
+      return new File([content], fileName, { type: mimeType || 'application/octet-stream' })
+    }
+
+    // If string (base64), decode and create File
+    if (typeof content === 'string') {
+      try {
+        // Remove data URL prefix if present (e.g., "data:image/png;base64,")
+        const base64String = content.includes(',') ? content.split(',')[1] : content
+
+        // Decode base64 to binary
+        const binaryString = atob(base64String)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
+        }
+
+        return new File([bytes], fileName, { type: mimeType || 'application/octet-stream' })
+      } catch (error) {
+        throw new Error(`Failed to decode base64 string for file ${fileName}: ${error}`)
+      }
+    }
+
+    throw new Error(`Unsupported content type for file ${fileName}`)
+  }
+
+  /**
+   * POST request with multipart/form-data for Dashboard API file uploads
+   * - Encodes JSON data as Base64 in 'data' field
+   * - Appends files with their actual filenames
+   * - Supports both File[] and IBizuitFile[] for flexible file sources
+   */
+  async postMultipart<T>(
+    url: string,
+    data: any,
+    files: File[] | IBizuitFile[],
+    config?: AxiosRequestConfig
+  ): Promise<T> {
+    const formData = new FormData()
+
+    // Base64 encode JSON data for Dashboard API
+    const jsonString = JSON.stringify(data)
+    const base64Data = btoa(jsonString)
+    formData.append('data', base64Data)
+
+    // Convert all files to File objects and add to FormData
+    const fileObjects = files.map((file) => {
+      if (file instanceof File) {
+        return file
+      }
+      return this.convertToFile(file as IBizuitFile)
+    })
+
+    fileObjects.forEach((file) => {
+      formData.append(file.name, file, file.name)
+    })
+
+    const requestConfig: AxiosRequestConfig = {
+      ...config,
+      headers: {
+        ...config?.headers,
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+
+    const response = await this.axiosInstance.post<T>(url, formData, requestConfig)
     return response.data
   }
 

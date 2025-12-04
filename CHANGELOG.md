@@ -5,6 +5,38 @@ All notable changes to `@tyconsa/bizuit-form-sdk` will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2024-12-04
+
+### Added
+
+- **File Upload Support**: Upload files when starting or continuing processes
+  - `BizuitHttpClient.postMultipart()` - POST with multipart/form-data
+  - Files parameter in `IStartProcessParams` interface
+  - Automatic Dashboard API integration (`/instances/RaiseEvent`)
+  - Base64 encoding of JSON payload for Dashboard API
+  - Support for file deletion via `deletedDocuments` parameter
+  - 8 comprehensive unit tests for file upload scenarios
+
+### Changed
+
+- Process methods now automatically switch between JSON and multipart modes
+- `start()` and `continue()` methods detect files and use Dashboard API endpoint when needed
+- Maintains backward compatibility - no changes to existing functionality
+
+### Documentation
+
+- Added [Example 8: File Uploads](./docs/examples/example8-file-uploads.md) - Complete file upload guide
+- Updated main README with file upload feature
+- Added test HTML page for manual testing
+
+### Technical Details
+
+- Files are sent with their actual filenames as FormData keys
+- JSON data is Base64 encoded in the 'data' field
+- Uses Dashboard API endpoint `/instances/RaiseEvent` for file uploads
+- Requires Basic Authentication for Dashboard API
+- Falls back to standard JSON endpoints when no files are present
+
 ## [2.2.0] - 2025-11-27
 
 ### Added

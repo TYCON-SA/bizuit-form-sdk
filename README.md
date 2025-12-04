@@ -6,6 +6,7 @@ Core SDK for Bizuit BPM form integration. Provides authentication, process manag
 
 - ✅ **Authentication & Authorization** - Token validation, user info, permission checks
 - ✅ **Process Management** - Initialize, start and continue processes, handle parameters
+- ✅ **File Uploads** - Upload files with Dashboard API multipart/form-data support (v2.4.0+)
 - ✅ **Instance Locking** - Pessimistic locking for concurrent access control
 - ✅ **DataService Queries** - Fetch lookup data, lists, and reports from BIZUIT Dashboard (v2.2.0+)
 - ✅ **Task List Management** - Retrieve user tasks based on BPM permissions with flattened JSON (v2.3.0+)

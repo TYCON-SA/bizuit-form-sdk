@@ -53,6 +53,17 @@ export interface IActivityResult {
   status: string
 }
 
+/**
+ * Flexible file attachment interface for Bizuit SDK
+ * Supports multiple file sources: browser File objects, base64 strings, Blobs, and ArrayBuffers
+ */
+export interface IBizuitFile {
+  fileName: string
+  content: File | string | Blob | ArrayBuffer  // File, base64 string, Blob, or ArrayBuffer
+  mimeType?: string
+  encoding?: 'base64' | 'binary'
+}
+
 export interface IStartProcessParams {
   processName: string
   instanceId?: string
@@ -60,6 +71,7 @@ export interface IStartProcessParams {
   processVersion?: string
   closeOnSuccess?: boolean
   deletedDocuments?: string[]
+  files?: File[] | IBizuitFile[] // File attachments for Dashboard API multipart/form-data
 }
 
 export interface IProcessResult {
