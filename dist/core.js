@@ -1055,12 +1055,26 @@ var BizuitProcessService = class {
       headers["BZ-CHILD-PROCESS-NAME"] = params.childProcessName;
     }
     const url = `${this.apiUrl}/eventmanager/workflowDefinition/parameters/${encodeURIComponent(params.processName)}?version=${encodeURIComponent(params.version || "")}`;
-    const rawParameters = await this.client.get(url, { headers });
+    const response = await this.client.get(url, { headers });
+    let rawParameters = [];
+    if (Array.isArray(response)) {
+      rawParameters = response;
+    } else if (response && typeof response === "object") {
+      if (Array.isArray(response.parameters)) {
+        rawParameters = response.parameters;
+      } else if (Array.isArray(response.Parameters)) {
+        rawParameters = response.Parameters;
+      } else if (Array.isArray(response.data)) {
+        rawParameters = response.data;
+      } else {
+        console.warn("[BizuitSDK] Unexpected response format from parameters endpoint:", response);
+      }
+    }
     const processData = {
       processName: params.processName,
       version: params.version || "",
       instanceId: params.instanceId,
-      parameters: (rawParameters || []).map((p) => ({
+      parameters: rawParameters.map((p) => ({
         name: p.name,
         value: null,
         // Start forms have empty values

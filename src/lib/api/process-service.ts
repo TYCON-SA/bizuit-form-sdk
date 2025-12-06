@@ -72,14 +72,35 @@ export class BizuitProcessService {
     // Use the correct Dashboard API endpoint for getting process parameters
     const url = `${this.apiUrl}/eventmanager/workflowDefinition/parameters/${encodeURIComponent(params.processName)}?version=${encodeURIComponent(params.version || '')}`
 
-    const rawParameters = await this.client.get<any[]>(url, { headers })
+    const response = await this.client.get<any>(url, { headers })
+
+    // Handle different API response formats:
+    // - Direct array: [{ name, parameterType, ... }]
+    // - Object with parameters property: { parameters: [...] }
+    // - Object with other structure: extract array from known properties
+    let rawParameters: any[] = []
+
+    if (Array.isArray(response)) {
+      rawParameters = response
+    } else if (response && typeof response === 'object') {
+      // Try common property names that might contain the parameters array
+      if (Array.isArray(response.parameters)) {
+        rawParameters = response.parameters
+      } else if (Array.isArray(response.Parameters)) {
+        rawParameters = response.Parameters
+      } else if (Array.isArray(response.data)) {
+        rawParameters = response.data
+      } else {
+        console.warn('[BizuitSDK] Unexpected response format from parameters endpoint:', response)
+      }
+    }
 
     // Transform to IProcessData format expected by the SDK
     const processData: IProcessData = {
       processName: params.processName,
       version: params.version || '',
       instanceId: params.instanceId,
-      parameters: (rawParameters || []).map(p => ({
+      parameters: rawParameters.map(p => ({
         name: p.name,
         value: null, // Start forms have empty values
         type: this.mapParameterType(p.parameterType),
