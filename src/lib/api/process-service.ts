@@ -28,16 +28,12 @@ export class BizuitProcessService {
 
   /**
    * Initialize process - Get parameters for new or existing instance
-   * Uses standard Authorization header as per API specification
+   * Uses the Dashboard API endpoint: /eventmanager/workflowDefinition/parameters/{processName}
+   *
+   * This method fetches the process parameter schema and transforms it to IProcessData format.
+   * For existing instances, use getInstanceData() to get parameter values.
    */
   async initialize(params: IInitializeParams): Promise<IProcessData> {
-    const queryParams = new URLSearchParams()
-    queryParams.append('processName', params.processName)
-
-    if (params.activityName) queryParams.append('activityName', params.activityName)
-    if (params.version) queryParams.append('version', params.version)
-    if (params.instanceId) queryParams.append('instanceId', params.instanceId)
-
     const headers: Record<string, string> = {}
 
     // Use standard Authorization header with token
@@ -73,12 +69,47 @@ export class BizuitProcessService {
       headers['BZ-CHILD-PROCESS-NAME'] = params.childProcessName
     }
 
-    const processData = await this.client.get<IProcessData>(
-      `${this.apiUrl}/Process/Initialize?${queryParams.toString()}`,
-      { headers }
-    )
+    // Use the correct Dashboard API endpoint for getting process parameters
+    const url = `${this.apiUrl}/eventmanager/workflowDefinition/parameters/${encodeURIComponent(params.processName)}?version=${encodeURIComponent(params.version || '')}`
+
+    const rawParameters = await this.client.get<any[]>(url, { headers })
+
+    // Transform to IProcessData format expected by the SDK
+    const processData: IProcessData = {
+      processName: params.processName,
+      version: params.version || '',
+      instanceId: params.instanceId,
+      parameters: (rawParameters || []).map(p => ({
+        name: p.name,
+        value: null, // Start forms have empty values
+        type: this.mapParameterType(p.parameterType),
+        direction: this.mapParameterDirection(p.parameterDirection),
+        schema: p.schema,
+        isVariable: p.isVariable,
+        isSystemParameter: p.isSystemParameter,
+        parameterType: p.parameterType
+      }))
+    }
 
     return processData
+  }
+
+  /**
+   * Map numeric parameter type to string
+   */
+  private mapParameterType(type: number): 'SingleValue' | 'Xml' {
+    return type === 2 ? 'Xml' : 'SingleValue'
+  }
+
+  /**
+   * Map numeric parameter direction to string
+   */
+  private mapParameterDirection(direction: number): 'In' | 'Out' | 'InOut' {
+    switch (direction) {
+      case 2: return 'Out'
+      case 3: return 'InOut'
+      default: return 'In'
+    }
   }
 
   /**

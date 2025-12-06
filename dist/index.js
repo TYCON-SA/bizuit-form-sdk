@@ -1027,14 +1027,12 @@ var BizuitProcessService = class {
   }
   /**
    * Initialize process - Get parameters for new or existing instance
-   * Uses standard Authorization header as per API specification
+   * Uses the Dashboard API endpoint: /eventmanager/workflowDefinition/parameters/{processName}
+   *
+   * This method fetches the process parameter schema and transforms it to IProcessData format.
+   * For existing instances, use getInstanceData() to get parameter values.
    */
   async initialize(params) {
-    const queryParams = new URLSearchParams();
-    queryParams.append("processName", params.processName);
-    if (params.activityName) queryParams.append("activityName", params.activityName);
-    if (params.version) queryParams.append("version", params.version);
-    if (params.instanceId) queryParams.append("instanceId", params.instanceId);
     const headers = {};
     if (params.token) {
       headers["Authorization"] = params.token;
@@ -1060,11 +1058,44 @@ var BizuitProcessService = class {
     if (params.childProcessName) {
       headers["BZ-CHILD-PROCESS-NAME"] = params.childProcessName;
     }
-    const processData = await this.client.get(
-      `${this.apiUrl}/Process/Initialize?${queryParams.toString()}`,
-      { headers }
-    );
+    const url = `${this.apiUrl}/eventmanager/workflowDefinition/parameters/${encodeURIComponent(params.processName)}?version=${encodeURIComponent(params.version || "")}`;
+    const rawParameters = await this.client.get(url, { headers });
+    const processData = {
+      processName: params.processName,
+      version: params.version || "",
+      instanceId: params.instanceId,
+      parameters: (rawParameters || []).map((p) => ({
+        name: p.name,
+        value: null,
+        // Start forms have empty values
+        type: this.mapParameterType(p.parameterType),
+        direction: this.mapParameterDirection(p.parameterDirection),
+        schema: p.schema,
+        isVariable: p.isVariable,
+        isSystemParameter: p.isSystemParameter,
+        parameterType: p.parameterType
+      }))
+    };
     return processData;
+  }
+  /**
+   * Map numeric parameter type to string
+   */
+  mapParameterType(type) {
+    return type === 2 ? "Xml" : "SingleValue";
+  }
+  /**
+   * Map numeric parameter direction to string
+   */
+  mapParameterDirection(direction) {
+    switch (direction) {
+      case 2:
+        return "Out";
+      case 3:
+        return "InOut";
+      default:
+        return "In";
+    }
   }
   /**
    * Start process - Execute process or start new instance

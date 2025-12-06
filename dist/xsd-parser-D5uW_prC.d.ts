@@ -1056,9 +1056,20 @@ declare class BizuitProcessService {
     constructor(config: IBizuitConfig);
     /**
      * Initialize process - Get parameters for new or existing instance
-     * Uses standard Authorization header as per API specification
+     * Uses the Dashboard API endpoint: /eventmanager/workflowDefinition/parameters/{processName}
+     *
+     * This method fetches the process parameter schema and transforms it to IProcessData format.
+     * For existing instances, use getInstanceData() to get parameter values.
      */
     initialize(params: IInitializeParams): Promise<IProcessData>;
+    /**
+     * Map numeric parameter type to string
+     */
+    private mapParameterType;
+    /**
+     * Map numeric parameter direction to string
+     */
+    private mapParameterDirection;
     /**
      * Start process - Execute process or start new instance
      * Sends JSON directly as per Bizuit API specification
