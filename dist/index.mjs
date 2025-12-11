@@ -1104,6 +1104,9 @@ var BizuitProcessService = class {
     const filesToUpload = params.files || files;
     let result;
     if (filesToUpload && filesToUpload.length > 0) {
+      if (!token) {
+        throw new Error("Token is required for file uploads. Make sure to pass dashboardParams.token to startProcess/continueProcess.");
+      }
       result = await this.client.postMultipart(
         `${this.apiUrl}/instances/RaiseEvent`,
         payload,
@@ -1273,6 +1276,9 @@ var BizuitProcessService = class {
     const filesToUpload = params.files || files;
     let result;
     if (filesToUpload && filesToUpload.length > 0) {
+      if (!token) {
+        throw new Error("Token is required for file uploads. Make sure to pass dashboardParams.token to startProcess/continueProcess.");
+      }
       result = await this.client.postMultipart(
         `${this.apiUrl}/instances/RaiseEvent`,
         payload,

@@ -224,6 +224,10 @@ export class BizuitProcessService {
 
     // Use multipart/form-data when files are present
     if (filesToUpload && filesToUpload.length > 0) {
+      // Token is REQUIRED for file uploads
+      if (!token) {
+        throw new Error('Token is required for file uploads. Make sure to pass dashboardParams.token to startProcess/continueProcess.')
+      }
       // Dashboard API: POST /api/instances/RaiseEvent with multipart
       result = await this.client.postMultipart<IProcessResult>(
         `${this.apiUrl}/instances/RaiseEvent`,
@@ -457,6 +461,10 @@ export class BizuitProcessService {
 
     // Use multipart/form-data when files are present
     if (filesToUpload && filesToUpload.length > 0) {
+      // Token is REQUIRED for file uploads
+      if (!token) {
+        throw new Error('Token is required for file uploads. Make sure to pass dashboardParams.token to startProcess/continueProcess.')
+      }
       // Dashboard API: POST /api/instances/RaiseEvent with multipart (continues also use POST)
       result = await this.client.postMultipart<IProcessResult>(
         `${this.apiUrl}/instances/RaiseEvent`,
