@@ -2221,7 +2221,8 @@ var BizuitDataServiceService = class {
         `${this.apiUrl}/Dashboard/DataService/GetByTabModuleId?tabModuleId=${tabModuleId}`,
         {
           headers: {
-            "Authorization": `Basic ${token}`
+            "Authorization": token
+            // Token already includes "Basic " prefix from login
           }
         }
       );
