@@ -486,10 +486,27 @@ describe('BizuitDataServiceService', () => {
         expect.stringContaining('/Dashboard/DataService/GetByTabModuleId?tabModuleId=1018'),
         expect.objectContaining({
           headers: {
-            'Authorization': `Basic ${mockToken}`,
+            // 🔴 The token goes AS-IS. It already carries its scheme from login, so prefixing
+            // it again here produced `Basic Basic <token>` and the Dashboard answered 401.
+            // That was fixed in 2.4.4 (commit 2d41770) and this expectation was left behind
+            // asserting the broken behaviour — which is why this test had been red ever since.
+            'Authorization': mockToken,
           },
         })
       )
+    })
+
+    it('does not prefix a token that already carries its scheme', async () => {
+      // The regression this guards against is invisible in the happy path: `Basic Basic <token>`
+      // is a perfectly well-formed header, and the only symptom is a 401 from the Dashboard —
+      // far from here, at runtime, in whatever form happened to call it.
+      mockHttpClient.get.mockResolvedValueOnce(createTabModuleResponse([], 1018))
+
+      await service.getByTabModuleId(1018, 'Basic ya-viene-con-su-esquema')
+
+      const [, opciones] = mockHttpClient.get.mock.calls[0]
+      expect(opciones.headers.Authorization).toBe('Basic ya-viene-con-su-esquema')
+      expect(opciones.headers.Authorization).not.toMatch(/Basic\s+Basic/)
     })
 
     it('should return empty array on error', async () => {
