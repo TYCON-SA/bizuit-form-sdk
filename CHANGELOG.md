@@ -5,6 +5,23 @@ All notable changes to `@tyconsa/bizuit-form-sdk` will be documented in this fil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-10-12
+
+### Added
+
+- **Session type**: know whether a form was opened with a Bizuit session or with an external session
+  - `getSessionType(dashboardParams)` - returns `'bizuit'` or `'external'`, read from `dashboardParams.sessionType`
+  - `isExternalSession(dashboardParams)` - `true` only for an external session
+  - `sdk.auth.getSessionType()` and `sdk.auth.isExternalSession()` - the same, as `BizuitAuthService` methods
+  - `BizuitSessionType` type (`'bizuit' | 'external'`)
+  - Without the field the session is a Bizuit one; any other value throws an `Error`
+  - They take the whole `dashboardParams` object, whatever its type; anything that is not an object throws an `Error`
+  - Exported from both entry points (`.` and `./core`); no request is made
+  - Inside the Bizuit runtime they exist only when the runtime ships SDK 2.5.0 or later
+  - README: new "Session type" section, and notes on what `validateToken`, `getUserInfo`, `checkPermissions` and
+    `useAuth` do with an external session
+  - Unit tests for the session type, for the existing auth methods with an external session, and for the public API
+
 ## [2.4.0] - 2024-12-04
 
 ### Added

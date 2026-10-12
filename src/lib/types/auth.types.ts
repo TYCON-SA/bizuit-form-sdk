@@ -78,6 +78,11 @@ export interface ILoginResponse {
 
 export type AuthControlType = 'secure' | 'anonymous'
 
+/**
+ * Which kind of session the form was opened with. The runtime writes it in `dashboardParams.sessionType`.
+ */
+export type BizuitSessionType = 'bizuit' | 'external'
+
 export interface IBizuitAuthHeaders {
   'BZ-AUTH-TOKEN'?: string
   'BZ-SESSION-TOKEN'?: string

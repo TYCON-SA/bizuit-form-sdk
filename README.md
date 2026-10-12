@@ -649,6 +649,9 @@ function LoginComponent() {
 }
 ```
 
+> **External sessions:** `useAuth` and `validateToken` expect a Bizuit token. In a form opened with an external
+> session they report "not authenticated". See [Session type](#session-type--new-in-v250).
+
 ### 3. Start a Process
 
 ```tsx
@@ -779,6 +782,71 @@ const hasAccess = await sdk.auth.checkPermissions(token, userName, [
   'User',
 ])
 ```
+
+> **External sessions:** `validateToken`, `getUserInfo` and `checkPermissions` expect a Bizuit token. A form opened
+> with an external session does not have one. See [Session type](#session-type--new-in-v250) for what each of them
+> does in that case and what to use instead.
+
+### Session type ✨ NEW in v2.5.0
+
+A form can be opened in two ways: from Bizuit Dashboard, by a Bizuit user, or with an **external session**, by a
+person who signed in through an external identity provider and has no Bizuit user. The runtime tells the form which
+one it was in `dashboardParams.sessionType`, and the SDK reads it:
+
+```typescript
+import { getSessionType, isExternalSession } from '@tyconsa/bizuit-form-sdk'
+
+export default function MyForm({ dashboardParams }) {
+  const sessionType = getSessionType(dashboardParams) // 'bizuit' | 'external'
+
+  if (isExternalSession(dashboardParams)) {
+    // e.g. hide what only makes sense for a Bizuit user
+  }
+
+  // ...
+}
+```
+
+The same two functions are available as `sdk.auth.getSessionType(dashboardParams)` and
+`sdk.auth.isExternalSession(dashboardParams)`, and from `@tyconsa/bizuit-form-sdk/core`. They make no request.
+
+| `dashboardParams.sessionType` | `getSessionType()` | `isExternalSession()` | When |
+|---|---|---|---|
+| `'external'` | `'external'` | `true` | The form was opened with an external session |
+| `'bizuit'` | `'bizuit'` | `false` | The form was opened from Bizuit Dashboard |
+| missing or `undefined` | `'bizuit'` | `false` | A runtime that does not write the field yet, development mode, or a form running outside the runtime |
+| anything else | throws an `Error` | throws an `Error` | The runtime sent a value outside the contract |
+
+The comparison is exact: no lowercasing and no trimming.
+
+Pass the whole `dashboardParams` object, whatever its type. Without an argument, or with `null`, the answer is
+`'bizuit'`. Anything that is not an object throws an `Error`: `isExternalSession(dashboardParams.sessionType)` is a
+mistake, not a session type. An object without the field reads as `'bizuit'`, so pass `dashboardParams` itself, not
+the form props that contain it.
+
+> **Inside the Bizuit runtime:** a form made with the standard form build does not bundle this package. It runs with
+> the runtime's own copy of the SDK. `getSessionType` and `isExternalSession` exist there only when the runtime ships
+> SDK 2.5.0 or later; on an older runtime they are `undefined`, and calling them throws a `TypeError`. A form that must
+> also run on older runtimes can read the field directly: `dashboardParams.sessionType === 'external'`.
+
+**It is informational, not an access control.** Use it to adapt what the form shows or does. Access is always decided
+by the server: never grant or deny access based on this value.
+
+#### External sessions and the token-based methods
+
+With an external session, `dashboardParams.token` is a placeholder, not a Bizuit token. The methods that take a
+Bizuit token do not work with it:
+
+| Call | What happens with an external session |
+|---|---|
+| `sdk.auth.validateToken(token)` | Returns `null`. No request is made. |
+| `sdk.auth.getUserInfo(token, userName)` | Sends the request; if the API rejects the token, the promise rejects. |
+| `sdk.auth.checkPermissions(token, userName, roles)` | Returns `false` when the API rejects the token, even if the person has the role. |
+| `sdk.auth.checkFormAuth(request, token)` | Returns `{ success: false, ... }` when the API rejects the token. It does not throw. |
+| `useAuth()` | `validateToken` returns `false` and `isAuthenticated` stays `false`. |
+
+Use what the runtime already gives the form instead: `dashboardParams.userName`, `dashboardParams.displayName`,
+`dashboardParams.roles` and `dashboardParams.roleSettings`.
 
 ### BizuitProcessService
 
@@ -1933,6 +2001,10 @@ const {
   autoValidate: true, // Auto-validate token on mount
 })
 ```
+
+> **External sessions:** `useAuth` (and its `validateToken`, `getUserInfo` and `checkPermissions`) expects a Bizuit
+> token. In a form opened with an external session it reports "not authenticated". Read the person from
+> `dashboardParams` instead. See [Session type](#session-type--new-in-v250).
 
 ### useBizuitSDK
 

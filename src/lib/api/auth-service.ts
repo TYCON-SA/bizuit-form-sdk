@@ -12,7 +12,46 @@ import type {
   IBizuitConfig,
   ILoginRequest,
   ILoginResponse,
+  BizuitSessionType,
 } from '../types'
+
+const SESSION_TYPES: readonly BizuitSessionType[] = ['bizuit', 'external']
+
+/**
+ * Which kind of session the form was opened with, read from `dashboardParams.sessionType`.
+ *
+ * The runtime writes that field. Without it the session is a Bizuit one: a runtime that does not write the
+ * field yet, development mode and a form running outside the runtime only know Bizuit sessions.
+ *
+ * It takes the whole `dashboardParams` object, whatever its type. It is informational, not an access control:
+ * access is always decided by the server.
+ *
+ * Inside the runtime, a form made with the standard form build runs with the runtime's copy of the SDK, so
+ * this function exists there only when the runtime ships SDK 2.5.0 or later.
+ *
+ * @throws Error if `params` is given and is not an object (for example, the value itself instead of
+ *   `dashboardParams`), or if `sessionType` is present and is not exactly `'bizuit'` or `'external'`
+ */
+export function getSessionType(params?: object | null): BizuitSessionType {
+  if (params === undefined || params === null) return 'bizuit'
+  if (typeof params !== 'object' || Array.isArray(params)) {
+    throw new Error(
+      '[BizuitSDK] getSessionType: expected the dashboardParams object, as in getSessionType(dashboardParams)'
+    )
+  }
+
+  const value = (params as { sessionType?: unknown }).sessionType
+  if (value === undefined) return 'bizuit'
+  if (SESSION_TYPES.includes(value as BizuitSessionType)) return value as BizuitSessionType
+  throw new Error("[BizuitSDK] getSessionType: sessionType must be 'bizuit' or 'external'")
+}
+
+/**
+ * True only when the form was opened with an external session. See `getSessionType`.
+ */
+export function isExternalSession(params?: object | null): boolean {
+  return getSessionType(params) === 'external'
+}
 
 export class BizuitAuthService {
   private client: BizuitHttpClient
@@ -136,6 +175,20 @@ export class BizuitAuthService {
       console.error('[BizuitAuthService] Permission check failed:', error)
       return false
     }
+  }
+
+  /**
+   * Which kind of session the form was opened with. Reads `dashboardParams.sessionType`; makes no request.
+   */
+  getSessionType(params?: object | null): BizuitSessionType {
+    return getSessionType(params)
+  }
+
+  /**
+   * True only when the form was opened with an external session. Makes no request.
+   */
+  isExternalSession(params?: object | null): boolean {
+    return isExternalSession(params)
   }
 
   /**
